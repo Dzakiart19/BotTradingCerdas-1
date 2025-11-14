@@ -12,14 +12,21 @@ Bot Telegram untuk memberikan sinyal trading XAUUSD (Emas) dengan strategi scalp
 - ✅ Ready for deployment to Koyeb.com
 
 ## Recent Changes (November 14, 2025)
-1. Created complete bot structure with 10+ modules
-2. Implemented WebSocket connections for Polygon.io and Finnhub
-3. Added SQLAlchemy database with Trade, Position, SignalLog, Performance models
-4. Created chart generator with mplfinance
-5. Implemented all Telegram commands (/start, /help, /monitor, /stopmonitor, /riwayat, /performa, /settings)
-6. Added risk management (cooldown, max trades/day, daily loss limit)
-7. Created Dockerfile for Koyeb deployment
-8. Comprehensive README documentation
+1. ✅ **Unlimited Trades Per Day**: Removed MAX_TRADES_PER_DAY limit (set to 999999 for unlimited 24/7 trading)
+2. ✅ **Auto Chart Cleanup**: Implemented auto-delete chart feature setelah terkirim ke Telegram untuk menghemat storage
+3. ✅ **7 New Modules Created**:
+   - `bot/utils.py` - Helper functions (formatting, validation, caching, rate limiting)
+   - `bot/pair_config.py` - Trading pair configuration dengan dataclass
+   - `bot/error_handler.py` - Advanced error handling dengan decorators, circuit breaker, retry mechanism
+   - `bot/alert_system.py` - Alert system untuk berbagai event (entry, exit, daily summary, risk warning)
+   - `bot/user_manager.py` - Multi-user management dengan SQLAlchemy models
+   - `bot/task_scheduler.py` - Task scheduler untuk automated tasks (cleanup, health check, daily summary)
+   - `bot/backtester.py` - Backtesting engine untuk test strategi dengan historical data
+4. ✅ **Full Integration**: Semua modul baru sudah terintegrasi dengan TradingBot dan PositionTracker
+5. ✅ **Alert System Wired**: Alert notifications untuk trade entry, exit (TP/SL hit), daily summary, system errors
+6. ✅ **User Manager Integration**: User activity tracking dan stats updates otomatis
+7. ✅ **Error Handler Integration**: Advanced error handling dengan logging dan retry mechanism
+8. ✅ **Documentation Updated**: README.md updated dengan fitur-fitur baru
 
 ## Project Architecture
 
