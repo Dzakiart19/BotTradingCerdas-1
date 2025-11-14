@@ -107,6 +107,8 @@ EMA_PERIODS=5,10,20
 RSI_PERIOD=14
 RSI_OVERSOLD_LEVEL=30
 RSI_OVERBOUGHT_LEVEL=70
+MAX_TRADES_PER_DAY=999999  # Unlimited
+CHART_AUTO_DELETE=true  # Auto-delete chart setelah terkirim
 # ... dll (lihat .env.example untuk semua opsi)
 ```
 
