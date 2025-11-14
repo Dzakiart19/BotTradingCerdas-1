@@ -12,7 +12,8 @@ logger = setup_logger('TelegramBot')
 
 class TradingBot:
     def __init__(self, config, db_manager, strategy, risk_manager, 
-                 market_data, position_tracker, chart_generator):
+                 market_data, position_tracker, chart_generator,
+                 alert_system=None, error_handler=None, user_manager=None):
         self.config = config
         self.db = db_manager
         self.strategy = strategy
@@ -20,6 +21,9 @@ class TradingBot:
         self.market_data = market_data
         self.position_tracker = position_tracker
         self.chart_generator = chart_generator
+        self.alert_system = alert_system
+        self.error_handler = error_handler
+        self.user_manager = user_manager
         self.app = None
         self.monitoring = False
         
@@ -32,6 +36,15 @@ class TradingBot:
         if not self.is_authorized(update.effective_user.id):
             await update.message.reply_text("⛔ Anda tidak memiliki akses ke bot ini.")
             return
+        
+        if self.user_manager:
+            self.user_manager.create_user(
+                telegram_id=update.effective_user.id,
+                username=update.effective_user.username,
+                first_name=update.effective_user.first_name,
+                last_name=update.effective_user.last_name
+            )
+            self.user_manager.update_user_activity(update.effective_user.id)
         
         welcome_msg = (
             "🤖 *XAUUSD Trading Bot*\n\n"
@@ -123,6 +136,9 @@ class TradingBot:
                                 if is_valid:
                                     await self._send_signal(chat_id, signal, df_m1)
                                     self.risk_manager.record_signal()
+                                    
+                                    if self.user_manager:
+                                        self.user_manager.update_user_activity(chat_id)
                                 else:
                                     logger.info(f"Signal validation failed: {validation_msg}")
                             else:
@@ -194,8 +210,21 @@ class TradingBot:
                 signal['take_profit']
             )
             
+            if self.alert_system:
+                await self.alert_system.send_trade_entry_alert({
+                    'signal_type': signal['signal'],
+                    'entry_price': signal['entry_price'],
+                    'stop_loss': signal['stop_loss'],
+                    'take_profit': signal['take_profit'],
+                    'timeframe': signal['timeframe']
+                })
+            
         except Exception as e:
             logger.error(f"Error sending signal: {e}")
+            if self.error_handler:
+                self.error_handler.log_exception(e, "send_signal")
+            if self.alert_system:
+                await self.alert_system.send_system_error(f"Error sending signal: {str(e)}")
     
     async def riwayat_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_authorized(update.effective_user.id):

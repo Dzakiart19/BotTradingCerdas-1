@@ -48,7 +48,13 @@ class TradingBotOrchestrator:
         self.market_data = MarketDataClient(self.config)
         self.strategy = TradingStrategy(self.config)
         self.risk_manager = RiskManager(self.config, self.db_manager)
-        self.position_tracker = PositionTracker(self.config, self.db_manager, self.risk_manager)
+        self.position_tracker = PositionTracker(
+            self.config, 
+            self.db_manager, 
+            self.risk_manager,
+            self.alert_system,
+            self.user_manager
+        )
         self.chart_generator = ChartGenerator(self.config)
         
         self.backtester = Backtester(self.config)
@@ -61,7 +67,10 @@ class TradingBotOrchestrator:
             self.risk_manager,
             self.market_data,
             self.position_tracker,
-            self.chart_generator
+            self.chart_generator,
+            self.alert_system,
+            self.error_handler,
+            self.user_manager
         )
         
         self.task_scheduler = TaskScheduler(self.config)

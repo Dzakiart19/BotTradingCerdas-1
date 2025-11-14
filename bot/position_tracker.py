@@ -8,10 +8,12 @@ from bot.database import Position, Trade
 logger = setup_logger('PositionTracker')
 
 class PositionTracker:
-    def __init__(self, config, db_manager, risk_manager):
+    def __init__(self, config, db_manager, risk_manager, alert_system=None, user_manager=None):
         self.config = config
         self.db = db_manager
         self.risk_manager = risk_manager
+        self.alert_system = alert_system
+        self.user_manager = user_manager
         self.active_positions = {}
         self.monitoring = False
         
@@ -125,9 +127,21 @@ class PositionTracker:
                 
             session.commit()
             
-            del self.active_positions[position_id]
-            
             logger.info(f"Position closed: ID={position_id}, Reason={reason}, P/L=${actual_pl:.2f}")
+            
+            if self.alert_system and trade:
+                await self.alert_system.send_trade_exit_alert({
+                    'signal_type': signal_type,
+                    'entry_price': entry_price,
+                    'exit_price': exit_price,
+                    'actual_pl': actual_pl
+                }, trade.result)
+            
+            if self.user_manager and trade:
+                for user_id in self.config.AUTHORIZED_USER_IDS:
+                    self.user_manager.update_user_stats(user_id, actual_pl)
+            
+            del self.active_positions[position_id]
             
         except Exception as e:
             logger.error(f"Error closing position {position_id}: {e}")

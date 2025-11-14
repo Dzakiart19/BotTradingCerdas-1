@@ -10,15 +10,3 @@ SQLAlchemy==2.0.23
 pytz==2023.3
 python-dotenv==1.0.0
 aiohttp==3.9.1
-aiohttp
-matplotlib
-mplfinance
-numpy
-pandas
-Pillow
-python-dotenv
-python-telegram-bot
-pytz
-requests
-SQLAlchemy
-websocket-client
