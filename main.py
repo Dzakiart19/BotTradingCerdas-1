@@ -12,6 +12,12 @@ from bot.risk_manager import RiskManager
 from bot.position_tracker import PositionTracker
 from bot.chart_generator import ChartGenerator
 from bot.telegram_bot import TradingBot
+from bot.error_handler import ErrorHandler
+from bot.alert_system import AlertSystem
+from bot.user_manager import UserManager
+from bot.task_scheduler import TaskScheduler, setup_default_tasks
+from bot.pair_config import PairConfigManager
+from bot.backtester import Backtester
 
 logger = setup_logger('Main')
 
@@ -23,8 +29,20 @@ class TradingBotOrchestrator:
         
         logger.info("Initializing trading bot components...")
         
+        self.error_handler = ErrorHandler(self.config)
+        logger.info("Error handler initialized")
+        
         self.db_manager = DatabaseManager(self.config.DATABASE_PATH)
         logger.info("Database initialized")
+        
+        self.pair_config = PairConfigManager(self.config)
+        logger.info("Pair config initialized")
+        
+        self.user_manager = UserManager(self.config)
+        logger.info("User manager initialized")
+        
+        self.alert_system = AlertSystem(self.config, self.db_manager)
+        logger.info("Alert system initialized")
         
         self.indicator_engine = IndicatorEngine(self.config)
         self.market_data = MarketDataClient(self.config)
@@ -32,6 +50,9 @@ class TradingBotOrchestrator:
         self.risk_manager = RiskManager(self.config, self.db_manager)
         self.position_tracker = PositionTracker(self.config, self.db_manager, self.risk_manager)
         self.chart_generator = ChartGenerator(self.config)
+        
+        self.backtester = Backtester(self.config)
+        logger.info("Backtester initialized")
         
         self.telegram_bot = TradingBot(
             self.config,
@@ -43,13 +64,19 @@ class TradingBotOrchestrator:
             self.chart_generator
         )
         
+        self.task_scheduler = TaskScheduler(self.config)
+        logger.info("Task scheduler initialized")
+        
         logger.info("All components initialized successfully")
     
     async def health_check(self, request):
         return web.json_response({
             'status': 'healthy',
             'running': self.running,
-            'active_positions': len(self.position_tracker.get_active_positions())
+            'active_positions': len(self.position_tracker.get_active_positions()),
+            'scheduler_running': self.task_scheduler.running,
+            'alert_system_enabled': self.alert_system.enabled,
+            'enabled_pairs': len(self.pair_config.get_enabled_pairs())
         })
     
     async def start_health_check_server(self):
@@ -74,8 +101,24 @@ class TradingBotOrchestrator:
         
         await self.start_health_check_server()
         
+        bot_components = {
+            'chart_generator': self.chart_generator,
+            'alert_system': self.alert_system,
+            'db_manager': self.db_manager,
+            'market_data': self.market_data
+        }
+        setup_default_tasks(self.task_scheduler, bot_components)
+        
+        await self.task_scheduler.start()
+        logger.info("Task scheduler started")
+        
         telegram_task = asyncio.create_task(self.telegram_bot.run())
         self.tasks.append(telegram_task)
+        
+        if self.telegram_bot.app:
+            chat_ids = self.config.AUTHORIZED_USER_IDS
+            self.alert_system.set_telegram_app(self.telegram_bot.app, chat_ids)
+            logger.info("Alert system connected to Telegram")
         
         position_monitor_task = asyncio.create_task(
             self.position_tracker.monitor_positions(self.position_price_feed)
@@ -84,6 +127,9 @@ class TradingBotOrchestrator:
         
         logger.info("🚀 Trading bot started successfully!")
         logger.info(f"Mode: {'DRY RUN (Simulation)' if self.config.DRY_RUN else 'LIVE'}")
+        logger.info(f"Trading Pairs: {', '.join([p.symbol for p in self.pair_config.get_enabled_pairs()])}")
+        logger.info(f"Max Trades/Day: Unlimited (24/7)")
+        logger.info(f"Chart Auto-Delete: {'Enabled' if self.config.CHART_AUTO_DELETE else 'Disabled'}")
         logger.info("Waiting for Telegram commands...")
         
         try:
@@ -94,6 +140,9 @@ class TradingBotOrchestrator:
     async def stop(self):
         logger.info("Stopping trading bot...")
         self.running = False
+        
+        await self.task_scheduler.stop()
+        logger.info("Task scheduler stopped")
         
         self.position_tracker.stop_monitoring()
         self.market_data.disconnect()

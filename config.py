@@ -33,9 +33,12 @@ class Config:
     DEFAULT_TP_PIPS = float(os.getenv('DEFAULT_TP_PIPS', '30.0'))
     
     SIGNAL_COOLDOWN_SECONDS = int(os.getenv('SIGNAL_COOLDOWN_SECONDS', '120'))
-    MAX_TRADES_PER_DAY = int(os.getenv('MAX_TRADES_PER_DAY', '5'))
+    MAX_TRADES_PER_DAY = int(os.getenv('MAX_TRADES_PER_DAY', '999999'))
     DAILY_LOSS_PERCENT = float(os.getenv('DAILY_LOSS_PERCENT', '3.0'))
     RISK_PER_TRADE_PERCENT = float(os.getenv('RISK_PER_TRADE_PERCENT', '0.5'))
+    
+    CHART_AUTO_DELETE = os.getenv('CHART_AUTO_DELETE', 'true').lower() == 'true'
+    CHART_EXPIRY_MINUTES = int(os.getenv('CHART_EXPIRY_MINUTES', '60'))
     
     WS_DISCONNECT_ALERT_SECONDS = int(os.getenv('WS_DISCONNECT_ALERT_SECONDS', '30'))
     

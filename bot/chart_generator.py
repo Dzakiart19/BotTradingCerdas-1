@@ -113,6 +113,17 @@ class ChartGenerator:
             logger.error(f"Error generating chart: {e}")
             return None
     
+    def delete_chart(self, filepath: str):
+        try:
+            if filepath and os.path.exists(filepath):
+                os.remove(filepath)
+                logger.info(f"Chart deleted: {filepath}")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Error deleting chart: {e}")
+            return False
+    
     def cleanup_old_charts(self, days: int = 7):
         try:
             now = datetime.now()

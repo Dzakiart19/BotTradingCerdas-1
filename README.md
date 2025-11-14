@@ -35,14 +35,24 @@
 - **Stop Loss**: Dinamis berdasarkan ATR atau fixed pips
 - **Take Profit**: Berdasarkan Risk-Reward Ratio yang dapat dikonfigurasi
 - **Cooldown**: Jeda antar sinyal untuk menghindari overtrading
-- **Max Trades/Day**: Batasan jumlah sinyal per hari
+- **Max Trades/Day**: **UNLIMITED (24/7)** - Tidak ada batasan jumlah sinyal
 - **Daily Loss Limit**: Bot berhenti jika drawdown melebihi threshold
+- **Auto Chart Cleanup**: Chart otomatis dihapus setelah terkirim untuk menghemat storage
 
 ### Notifikasi Telegram
 - **Sinyal Entry**: Ticker, tipe (BUY/SELL), entry price, TP, SL, spread, estimasi P/L
-- **Screenshot Chart**: M1/M5 dengan marker Entry/TP/SL dan nilai indikator
+- **Screenshot Chart**: M1/M5 dengan marker Entry/TP/SL dan nilai indikator (auto-delete)
 - **Hasil Trade**: WIN/LOSE notification saat TP/SL tercapai
+- **Alert System**: Notifikasi untuk berbagai event (daily summary, risk warning, system error, dll)
 - **Timezone**: UTC dan Asia/Jakarta (WIB)
+
+### Fitur Advanced
+- **Task Scheduler**: Automated tasks seperti cleanup chart, daily summary, health check
+- **Alert System**: Sistem notifikasi advanced untuk berbagai event trading
+- **User Manager**: Manajemen multi-user dengan preferences individual
+- **Error Handler**: Advanced error handling dengan retry mechanism
+- **Backtester**: Engine untuk backtest strategi dengan historical data
+- **Pair Config**: Konfigurasi multi-pair trading (XAUUSD, XAGUSD, EURUSD, GBPUSD)
 
 ### Perintah Bot
 - `/start` - Pesan selamat datang

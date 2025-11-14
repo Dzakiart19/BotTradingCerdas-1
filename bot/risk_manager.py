@@ -31,13 +31,6 @@ class RiskManager:
             today_start = jakarta_time.replace(hour=0, minute=0, second=0, microsecond=0)
             today_start_utc = today_start.astimezone(pytz.UTC)
             
-            trades_today = session.query(Trade).filter(
-                Trade.signal_time >= today_start_utc
-            ).count()
-            
-            if trades_today >= self.config.MAX_TRADES_PER_DAY:
-                return False, f"Batas maksimal {self.config.MAX_TRADES_PER_DAY} trade per hari tercapai"
-            
             daily_pl = session.query(Trade).filter(
                 Trade.signal_time >= today_start_utc,
                 Trade.actual_pl.isnot(None)

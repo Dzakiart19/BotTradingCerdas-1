@@ -66,7 +66,7 @@ class TradingBot:
             f"- Stochastic: K={self.config.STOCH_K_PERIOD}, D={self.config.STOCH_D_PERIOD}\n"
             f"- ATR: {self.config.ATR_PERIOD}\n\n"
             "*Risk Management:*\n"
-            f"- Max trades per day: {self.config.MAX_TRADES_PER_DAY}\n"
+            f"- Max trades per day: Unlimited (24/7)\n"
             f"- Daily loss limit: {self.config.DAILY_LOSS_PERCENT}%\n"
             f"- Signal cooldown: {self.config.SIGNAL_COOLDOWN_SECONDS}s\n"
             f"- Risk per trade: {self.config.RISK_PER_TRADE_PERCENT}%\n"
@@ -180,6 +180,11 @@ class TradingBot:
                     if chart_path:
                         with open(chart_path, 'rb') as photo:
                             await self.app.bot.send_photo(chat_id=chat_id, photo=photo)
+                        
+                        if self.config.CHART_AUTO_DELETE:
+                            await asyncio.sleep(2)
+                            self.chart_generator.delete_chart(chart_path)
+                            logger.info(f"Auto-deleted chart after sending: {chart_path}")
             
             await self.position_tracker.add_position(
                 trade_id,
@@ -292,7 +297,7 @@ class TradingBot:
             f"RSI Period: {self.config.RSI_PERIOD}\n"
             f"ATR Period: {self.config.ATR_PERIOD}\n\n"
             "*Risk Management:*\n"
-            f"Max Trades/Day: {self.config.MAX_TRADES_PER_DAY}\n"
+            f"Max Trades/Day: Unlimited (24/7)\n"
             f"Daily Loss Limit: {self.config.DAILY_LOSS_PERCENT}%\n"
             f"Signal Cooldown: {self.config.SIGNAL_COOLDOWN_SECONDS}s\n"
             f"SL ATR Multiplier: {self.config.SL_ATR_MULTIPLIER}x\n"
