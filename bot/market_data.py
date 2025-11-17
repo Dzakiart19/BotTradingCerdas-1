@@ -67,9 +67,11 @@ class OHLCBuilder:
 class MarketDataClient:
     def __init__(self, config):
         self.config = config
-        self.ws_url = "wss://ws-json.exness.com/realtime"
+        self.ws_url = "wss://ws.derivws.com/websockets/v3?app_id=1089"
+        self.symbol = "frxXAUUSD"
         self.current_bid = None
         self.current_ask = None
+        self.current_quote = None
         self.current_timestamp = None
         self.ws = None
         self.connected = False
@@ -78,11 +80,12 @@ class MarketDataClient:
         self.running = False
         self.use_simulator = False
         self.simulator_task = None
+        self.last_ping = 0
         
         self.m1_builder = OHLCBuilder(timeframe_minutes=1)
         self.m5_builder = OHLCBuilder(timeframe_minutes=5)
         
-        self.reconnect_delay = 5
+        self.reconnect_delay = 3
         self.base_price = 2650.0
         self.price_volatility = 2.0
         
@@ -91,25 +94,32 @@ class MarketDataClient:
         
         while self.running:
             try:
-                logger.info(f"Connecting to Exness WebSocket: {self.ws_url}")
+                logger.info(f"Connecting to Deriv WebSocket: {self.ws_url}")
                 
                 async with websockets.connect(
                     self.ws_url,
-                    ping_interval=20,
-                    ping_timeout=10
+                    ping_interval=None
                 ) as websocket:
                     self.ws = websocket
                     self.connected = True
                     self.reconnect_attempts = 0
                     
-                    logger.info("WebSocket connected to Exness")
+                    logger.info(f"✅ Connected to Deriv WebSocket")
                     
-                    subscribe_msg = {"type": "subscribe", "pairs": ["XAUUSD"]}
+                    subscribe_msg = {"ticks": self.symbol}
                     await websocket.send(json.dumps(subscribe_msg))
-                    logger.info("Subscribed to XAUUSD")
+                    logger.info(f"📡 Subscribed to {self.symbol}")
+                    
+                    heartbeat_task = asyncio.create_task(self._send_heartbeat())
                     
                     async for message in websocket:
                         await self._on_message(message)
+                    
+                    heartbeat_task.cancel()
+                    try:
+                        await heartbeat_task
+                    except asyncio.CancelledError:
+                        pass
                         
             except websockets.exceptions.ConnectionClosed as e:
                 logger.warning(f"WebSocket connection closed: {e}")
@@ -120,6 +130,20 @@ class MarketDataClient:
                 logger.error(f"WebSocket error: {e}")
                 self.connected = False
                 await self._handle_reconnect()
+    
+    async def _send_heartbeat(self):
+        while self.running and self.ws:
+            try:
+                import time
+                current_time = time.time()
+                if current_time - self.last_ping >= 20:
+                    ping_msg = {"ping": 1}
+                    await self.ws.send(json.dumps(ping_msg))
+                    self.last_ping = current_time
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.debug(f"Heartbeat error: {e}")
+                break
     
     async def _handle_reconnect(self):
         if not self.running:
@@ -187,39 +211,34 @@ class MarketDataClient:
             data = json.loads(message)
             
             if isinstance(data, dict):
-                bid = None
-                ask = None
-                timestamp_ms = None
+                if "tick" in data:
+                    tick = data["tick"]
+                    epoch = tick.get("epoch", int(datetime.utcnow().timestamp()))
+                    bid = tick.get("bid")
+                    ask = tick.get("ask")
+                    quote = tick.get("quote")
+                    
+                    if bid and ask:
+                        self.current_bid = float(bid)
+                        self.current_ask = float(ask)
+                        self.current_quote = float(quote) if quote else (self.current_bid + self.current_ask) / 2
+                        self.current_timestamp = datetime.fromtimestamp(epoch)
+                        
+                        self.m1_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
+                        self.m5_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
+                        
+                        logger.info(f"💰 Tick: Bid={self.current_bid:.2f}, Ask={self.current_ask:.2f}, Quote={self.current_quote:.2f}")
+                    
+                elif "pong" in data:
+                    logger.debug("Pong received")
                 
-                if 'bid' in data and 'ask' in data:
-                    bid = data['bid']
-                    ask = data['ask']
-                    timestamp_ms = data.get('timestamp') or data.get('t')
-                elif 'price' in data:
-                    price = data['price']
-                    spread = data.get('spread', 0.5)
-                    bid = price - (spread / 2)
-                    ask = price + (spread / 2)
-                    timestamp_ms = data.get('timestamp') or data.get('t')
+                elif "error" in data:
+                    error = data["error"]
+                    logger.error(f"API Error: {error.get('message', 'Unknown error')}")
                 
-                if bid is not None and ask is not None:
-                    self.current_bid = float(bid)
-                    self.current_ask = float(ask)
-                    
-                    if timestamp_ms:
-                        if timestamp_ms > 10000000000:
-                            self.current_timestamp = datetime.fromtimestamp(timestamp_ms / 1000.0)
-                        else:
-                            self.current_timestamp = datetime.fromtimestamp(timestamp_ms)
-                    else:
-                        self.current_timestamp = datetime.utcnow()
-                    
-                    self.m1_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
-                    self.m5_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
-                    
-                    logger.info(f"WebSocket tick: Bid={self.current_bid:.2f}, Ask={self.current_ask:.2f}")
-                else:
-                    logger.debug(f"Unknown message format: {data}")
+                elif "msg_type" in data:
+                    if data["msg_type"] not in ["tick", "ping", "pong"]:
+                        logger.debug(f"Message: {data.get('msg_type')}")
                         
         except Exception as e:
             logger.error(f"Error processing message: {e}, Raw: {message[:200]}")
