@@ -1,199 +1,183 @@
+#!/usr/bin/env python3
+"""
+XAUUSD Trading Bot - Deriv WebSocket Client
+Production-ready untuk Replit/Koyeb
+No API key required
+"""
+
 import asyncio
-import signal
-import sys
-from aiohttp import web
-from config import Config
-from bot.logger import setup_logger
-from bot.database import DatabaseManager
-from bot.indicators import IndicatorEngine
-from bot.market_data import MarketDataClient
-from bot.strategy import TradingStrategy
-from bot.risk_manager import RiskManager
-from bot.position_tracker import PositionTracker
-from bot.chart_generator import ChartGenerator
-from bot.telegram_bot import TradingBot
-from bot.error_handler import ErrorHandler
-from bot.alert_system import AlertSystem
-from bot.user_manager import UserManager
-from bot.task_scheduler import TaskScheduler, setup_default_tasks
-from bot.pair_config import PairConfigManager
-from bot.backtester import Backtester
+import json
+import time
+import websockets
+from datetime import datetime
 
-logger = setup_logger('Main')
+DERIV_WS_URL = "wss://ws.derivws.com/websockets/v3?app_id=1089"
+SYMBOL = "frxXAUUSD"
+HEARTBEAT_INTERVAL = 20
+RECONNECT_DELAY = 3
 
-class TradingBotOrchestrator:
+
+class DerivWebSocketClient:
     def __init__(self):
-        self.config = Config()
-        self.running = False
-        self.tasks = []
-        
-        logger.info("Initializing trading bot components...")
-        
-        self.error_handler = ErrorHandler(self.config)
-        logger.info("Error handler initialized")
-        
-        self.db_manager = DatabaseManager(self.config.DATABASE_PATH)
-        logger.info("Database initialized")
-        
-        self.pair_config = PairConfigManager(self.config)
-        logger.info("Pair config initialized")
-        
-        self.user_manager = UserManager(self.config)
-        logger.info("User manager initialized")
-        
-        self.alert_system = AlertSystem(self.config, self.db_manager)
-        logger.info("Alert system initialized")
-        
-        self.indicator_engine = IndicatorEngine(self.config)
-        self.market_data = MarketDataClient(self.config)
-        self.strategy = TradingStrategy(self.config)
-        self.risk_manager = RiskManager(self.config, self.db_manager)
-        self.position_tracker = PositionTracker(
-            self.config, 
-            self.db_manager, 
-            self.risk_manager,
-            self.alert_system,
-            self.user_manager
-        )
-        self.chart_generator = ChartGenerator(self.config)
-        
-        self.backtester = Backtester(self.config)
-        logger.info("Backtester initialized")
-        
-        self.telegram_bot = TradingBot(
-            self.config,
-            self.db_manager,
-            self.strategy,
-            self.risk_manager,
-            self.market_data,
-            self.position_tracker,
-            self.chart_generator,
-            self.alert_system,
-            self.error_handler,
-            self.user_manager
-        )
-        
-        self.task_scheduler = TaskScheduler(self.config)
-        logger.info("Task scheduler initialized")
-        
-        logger.info("All components initialized successfully")
-    
-    async def health_check(self, request):
-        return web.json_response({
-            'status': 'healthy',
-            'running': self.running,
-            'active_positions': len(self.position_tracker.get_active_positions()),
-            'scheduler_running': self.task_scheduler.running,
-            'alert_system_enabled': self.alert_system.enabled,
-            'enabled_pairs': len(self.pair_config.get_enabled_pairs())
-        })
-    
-    async def start_health_check_server(self):
-        app = web.Application()
-        app.router.add_get('/health', self.health_check)
-        
-        runner = web.AppRunner(app)
-        await runner.setup()
-        
-        site = web.TCPSite(runner, '0.0.0.0', self.config.HEALTH_CHECK_PORT)
-        await site.start()
-        
-        logger.info(f"Health check server running on port {self.config.HEALTH_CHECK_PORT}")
-    
-    async def position_price_feed(self):
-        price = await self.market_data.get_current_price()
-        return price if price else 0.0
-    
-    async def start(self):
-        logger.info("Starting trading bot orchestrator...")
+        self.ws = None
         self.running = True
+        self.last_ping = 0
         
-        await self.start_health_check_server()
-        
-        bot_components = {
-            'chart_generator': self.chart_generator,
-            'alert_system': self.alert_system,
-            'db_manager': self.db_manager,
-            'market_data': self.market_data
-        }
-        setup_default_tasks(self.task_scheduler, bot_components)
-        
-        await self.task_scheduler.start()
-        logger.info("Task scheduler started")
-        
-        market_data_task = asyncio.create_task(self.market_data.connect_websocket())
-        self.tasks.append(market_data_task)
-        logger.info("WebSocket connection task started")
-        
-        await asyncio.sleep(3)
-        
-        telegram_task = asyncio.create_task(self.telegram_bot.run())
-        self.tasks.append(telegram_task)
-        
-        if self.telegram_bot.app:
-            chat_ids = self.config.AUTHORIZED_USER_IDS
-            self.alert_system.set_telegram_app(self.telegram_bot.app, chat_ids)
-            logger.info("Alert system connected to Telegram")
-        
-        position_monitor_task = asyncio.create_task(
-            self.position_tracker.monitor_positions(self.position_price_feed)
-        )
-        self.tasks.append(position_monitor_task)
-        
-        logger.info("🚀 Trading bot started successfully!")
-        logger.info(f"Mode: {'DRY RUN (Simulation)' if self.config.DRY_RUN else 'LIVE'}")
-        logger.info(f"Trading Pairs: {', '.join([p.symbol for p in self.pair_config.get_enabled_pairs()])}")
-        logger.info(f"Max Trades/Day: Unlimited (24/7)")
-        logger.info(f"Chart Auto-Delete: {'Enabled' if self.config.CHART_AUTO_DELETE else 'Disabled'}")
-        logger.info("Waiting for Telegram commands...")
-        
+    async def connect(self):
+        """Establish WebSocket connection"""
         try:
-            await asyncio.gather(*self.tasks)
-        except asyncio.CancelledError:
-            logger.info("Tasks cancelled, shutting down...")
+            print(f"🔄 Connecting to Deriv WebSocket...")
+            self.ws = await asyncio.wait_for(
+                websockets.connect(DERIV_WS_URL, ping_interval=None),
+                timeout=10
+            )
+            print(f"✅ Connected to {DERIV_WS_URL}")
+            return True
+        except asyncio.TimeoutError:
+            print("⚠️ Connection timeout")
+            return False
+        except Exception as e:
+            print(f"⚠️ Connection error: {e}")
+            return False
     
-    async def stop(self):
-        logger.info("Stopping trading bot...")
+    async def subscribe_ticks(self):
+        """Subscribe to XAUUSD ticks"""
+        try:
+            subscribe_msg = {"ticks": SYMBOL}
+            await self.ws.send(json.dumps(subscribe_msg))
+            print(f"📡 Subscribed to {SYMBOL}")
+            return True
+        except Exception as e:
+            print(f"⚠️ Subscribe error: {e}")
+            return False
+    
+    async def send_heartbeat(self):
+        """Send ping to keep connection alive"""
+        while self.running and self.ws:
+            try:
+                current_time = time.time()
+                if current_time - self.last_ping >= HEARTBEAT_INTERVAL:
+                    ping_msg = {"ping": 1}
+                    await self.ws.send(json.dumps(ping_msg))
+                    self.last_ping = current_time
+                await asyncio.sleep(1)
+            except Exception as e:
+                print(f"⚠️ Heartbeat error: {e}")
+                break
+    
+    async def handle_ticks(self):
+        """Receive and print tick data"""
+        try:
+            async for message in self.ws:
+                try:
+                    data = json.loads(message)
+                    
+                    if "tick" in data:
+                        tick = data["tick"]
+                        epoch = tick.get("epoch", int(time.time()))
+                        bid = tick.get("bid", 0)
+                        ask = tick.get("ask", 0)
+                        quote = tick.get("quote", 0)
+                        
+                        timestamp = datetime.fromtimestamp(epoch).strftime("%Y-%m-%d %H:%M:%S")
+                        print(f"[{epoch}] {timestamp} | bid={bid:.2f}, ask={ask:.2f}, quote={quote:.2f}")
+                    
+                    elif "pong" in data:
+                        pass
+                    
+                    elif "error" in data:
+                        error = data["error"]
+                        print(f"❌ API Error: {error.get('message', 'Unknown error')}")
+                    
+                    elif "msg_type" in data:
+                        if data["msg_type"] != "tick" and data["msg_type"] != "ping":
+                            print(f"ℹ️  Message: {data.get('msg_type')}")
+                
+                except json.JSONDecodeError:
+                    print(f"⚠️ Invalid JSON: {message}")
+                except Exception as e:
+                    print(f"⚠️ Parse error: {e}")
+        
+        except websockets.exceptions.ConnectionClosed:
+            print("⚠️ Connection closed by server")
+        except Exception as e:
+            print(f"⚠️ Receive error: {e}")
+    
+    async def run(self):
+        """Main loop with auto-reconnect"""
+        while self.running:
+            try:
+                connected = await self.connect()
+                
+                if not connected:
+                    print(f"⏳ Reconnecting in {RECONNECT_DELAY} seconds...")
+                    await asyncio.sleep(RECONNECT_DELAY)
+                    continue
+                
+                subscribed = await self.subscribe_ticks()
+                
+                if not subscribed:
+                    print(f"⏳ Reconnecting in {RECONNECT_DELAY} seconds...")
+                    await asyncio.sleep(RECONNECT_DELAY)
+                    continue
+                
+                heartbeat_task = asyncio.create_task(self.send_heartbeat())
+                
+                await self.handle_ticks()
+                
+                heartbeat_task.cancel()
+                try:
+                    await heartbeat_task
+                except asyncio.CancelledError:
+                    pass
+                
+                if self.ws:
+                    await self.ws.close()
+                
+                print(f"⚠️ Disconnected, reconnecting in {RECONNECT_DELAY} seconds...")
+                await asyncio.sleep(RECONNECT_DELAY)
+            
+            except KeyboardInterrupt:
+                print("\n🛑 Shutting down...")
+                self.running = False
+                break
+            except Exception as e:
+                print(f"⚠️ Unexpected error: {e}")
+                print(f"⏳ Reconnecting in {RECONNECT_DELAY} seconds...")
+                await asyncio.sleep(RECONNECT_DELAY)
+        
+        if self.ws:
+            await self.ws.close()
+        
+        print("👋 WebSocket client stopped")
+    
+    def stop(self):
+        """Stop the client"""
         self.running = False
-        
-        await self.task_scheduler.stop()
-        logger.info("Task scheduler stopped")
-        
-        self.position_tracker.stop_monitoring()
-        self.market_data.disconnect()
-        
-        for task in self.tasks:
-            task.cancel()
-        
-        await asyncio.gather(*self.tasks, return_exceptions=True)
-        
-        self.db_manager.close()
-        logger.info("Trading bot stopped")
+
 
 async def main():
-    orchestrator = TradingBotOrchestrator()
+    """Entry point"""
+    print("=" * 70)
+    print("🚀 XAUUSD Trading Bot - Deriv WebSocket Client")
+    print("=" * 70)
+    print(f"WebSocket: {DERIV_WS_URL}")
+    print(f"Symbol: {SYMBOL}")
+    print(f"Heartbeat: {HEARTBEAT_INTERVAL}s")
+    print("=" * 70)
+    print()
     
-    def signal_handler(signum, frame):
-        logger.info(f"Received signal {signum}, initiating shutdown...")
-        asyncio.create_task(orchestrator.stop())
-    
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    client = DerivWebSocketClient()
     
     try:
-        await orchestrator.start()
+        await client.run()
     except KeyboardInterrupt:
-        logger.info("Keyboard interrupt received")
-    except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
-    finally:
-        await orchestrator.stop()
+        print("\n🛑 Shutting down...")
+        client.stop()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Application terminated by user")
-    except Exception as e:
-        logger.error(f"Application crashed: {e}", exc_info=True)
-        sys.exit(1)
+        print("\n👋 Goodbye!")

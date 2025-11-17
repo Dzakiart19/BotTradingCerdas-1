@@ -1,97 +1,93 @@
 # XAUUSD Trading Bot - Replit Project
 
 ## Gambaran Proyek
-Bot trading otomatis untuk XAUUSD (Gold) yang mengirimkan sinyal trading ke Telegram berdasarkan analisis teknikal multi-indikator.
+Real-time streaming XAUUSD (Gold) prices menggunakan Deriv WebSocket tanpa API key.
 
-## Perubahan Terbaru (17 November 2025)
+## Perubahan Terbaru (17 November 2025 - Latest)
 
-### Refactoring Data Source
-- **DIHAPUS**: Semua dependensi API berbayar (Polygon.io, Finnhub, TwelveData, GoldAPI)
-- **DITAMBAHKAN**: WebSocket realtime dari broker Exness
-- **URL WebSocket**: `wss://ws-json.exness.com/realtime`
-- **OHLC Builder**: Candle M1/M5 dibuild otomatis dari tick feed
-- **Volume Proxy**: Menggunakan tick count sebagai proxy volume
-- **TIDAK PERLU API KEY**: Bot sepenuhnya gratis tanpa API key
+### Complete Rewrite: Deriv WebSocket Client
+- **DIHAPUS**: Complex trading bot dengan multi-component architecture
+- **DIHAPUS**: Semua API key dependencies (Exness, Polygon, Finnhub, etc)
+- **DITAMBAHKAN**: Simple production-ready WebSocket client
+- **Data Source**: Deriv WebSocket API (public demo app_id=1089)
+- **URL**: `wss://ws.derivws.com/websockets/v3?app_id=1089`
+- **Subscribe**: `{"ticks": "frxXAUUSD"}`
+- **Output**: `[epoch] timestamp | bid=X, ask=X, quote=X`
 
-### Arsitektur Data Feed
-1. **WebSocket Connection**: Koneksi persistent ke `wss://ws-json.exness.com/realtime`
-2. **Tick Processing**: Setiap tick (bid/ask) diproses realtime
-3. **OHLC Building**: 
-   - M1 candles: Built from tick feed setiap menit
-   - M5 candles: Built from tick feed setiap 5 menit
-4. **Auto-Reconnect**: Reconnect otomatis dengan unlimited attempts
-5. **Zero Dependencies**: Tidak ada API key yang diperlukan
+### Architecture
+**Simple Single-File Design:**
+- `main.py`: Complete WebSocket client (~200 lines)
+  - `connect()`: Establish WebSocket connection
+  - `subscribe_ticks()`: Subscribe ke frxXAUUSD
+  - `send_heartbeat()`: Ping/pong every 20 seconds
+  - `handle_ticks()`: Print tick data to console
+  - `run()`: Infinite loop dengan auto-reconnect
+  - Error handling: ConnectionClosed, TimeoutError, gaierror, etc
 
-### File yang Dimodifikasi
-- `bot/market_data.py`: Complete rewrite untuk WebSocket Exness + OHLC builder
-- `config.py`: Removed semua API key fields
-- `requirements.txt`: Updated websockets library
-- `main.py`: Added WebSocket connection startup
-- `bot/telegram_bot.py`: Updated untuk menggunakan spread dari WebSocket
-- `README.md`: Updated dokumentasi
+**Libraries:**
+- asyncio (built-in)
+- websockets
+- json (built-in)
+- time (built-in)
+- datetime (built-in)
+
+### File Changes
+- `main.py`: Complete rewrite - simple WebSocket client
+- `main_old_backup.py`: Backup of old complex bot
+- `README.md`: Updated documentation
+- `replit.md`: Updated project notes
+- Workflow: `deriv-websocket` runs `python main.py`
 
 ## Struktur Proyek
 
-### Core Components
-- **main.py**: Orchestrator utama
-- **config.py**: Konfigurasi environment (NO API KEYS)
-- **bot/market_data.py**: WebSocket client + OHLC builder
-- **bot/strategy.py**: Trading strategy logic
-- **bot/indicators.py**: Technical indicators (EMA, RSI, Stochastic, ATR)
-- **bot/risk_manager.py**: Risk management
-- **bot/position_tracker.py**: Position monitoring
-- **bot/telegram_bot.py**: Telegram interface
-- **bot/database.py**: SQLite database models
+**Active Files (Production):**
+- `main.py`: Complete Deriv WebSocket client (~200 lines)
+- `requirements.txt`: Dependencies (websockets==12.0)
+- `README.md`: Documentation
+- `replit.md`: Project notes
+- Workflow: `deriv-websocket` runs `python main.py`
 
-### Data Flow
-1. WebSocket receives bid/ask ticks from Exness
-2. OHLCBuilder builds M1/M5 candles from ticks
-3. IndicatorEngine calculates technical indicators
-4. TradingStrategy detects BUY/SELL signals
-5. RiskManager validates signals
-6. Telegram sends notifications to users
-7. PositionTracker monitors TP/SL
+**Archived Files (Backup Only):**
+- `old_trading_bot/`: Legacy trading bot code (tidak dipakai)
+- `main_old_backup.py`: Old orchestrator backup
+- `README_old_backup.md`: Old documentation backup
+- `data/`, `logs/`, `charts/`: Old data folders (bisa dihapus)
 
-## Environment Variables Penting
+**Dependencies (Active):**
+- asyncio (built-in)
+- websockets==12.0 (external)
+- json, time, datetime (built-in)
 
-```bash
-# Telegram (WAJIB)
-TELEGRAM_BOT_TOKEN=your_bot_token
-AUTHORIZED_USER_IDS=123456789,987654321
+**Note:** Hanya `main.py` yang aktif digunakan. Semua files di `old_trading_bot/` adalah backup untuk reference saja.
 
-# Trading Parameters
-EMA_PERIODS=5,10,20
-RSI_PERIOD=14
-RSI_OVERSOLD_LEVEL=30
-RSI_OVERBOUGHT_LEVEL=70
-MAX_TRADES_PER_DAY=999999
-SIGNAL_COOLDOWN_SECONDS=120
-DAILY_LOSS_PERCENT=3.0
+## Configuration
 
-# Mode
-DRY_RUN=false
+All configuration in `main.py`:
+
+```python
+DERIV_WS_URL = "wss://ws.derivws.com/websockets/v3?app_id=1089"
+SYMBOL = "frxXAUUSD"
+HEARTBEAT_INTERVAL = 20  # seconds
+RECONNECT_DELAY = 3      # seconds
 ```
 
 ## Known Issues
 
-### WebSocket Connection
-- URL `wss://ws-json.exness.com/realtime` tidak terdokumentasi publik
-- Mungkin tidak dapat diakses dari beberapa environment
-- Auto-reconnect akan terus mencoba jika gagal
+None - WebSocket berfungsi dengan baik dan stabil.
 
 ## Preferensi User
 - Bahasa komunikasi: Bahasa Indonesia
-- NO API KEY - bot harus 100% gratis
-- Data source: WebSocket broker realtime only
+- NO API KEY - bot 100% gratis
+- Data source: Deriv WebSocket only
 - Trading pair: XAUUSD
-- Timeframe: M1 dan M5
-- Mode: 24/7 unlimited trades
+- Output: Console streaming (epoch, bid, ask, quote)
+- Mode: 24/7 unlimited streaming
 
 ## Deployment
 - Platform: Replit / Koyeb
-- Database: SQLite dengan persistent storage
-- Port: 8080 (health check)
-- Restart policy: Always
+- Port: None (console app)
+- Restart policy: Auto-restart on failure
+- Workflow: `deriv-websocket` runs `python main.py`
 
 ## Catatan Penting
-Bot ini HANYA memberikan sinyal trading via Telegram. TIDAK ada eksekusi trading otomatis. User bertanggung jawab penuh atas semua keputusan trading.
+Ini adalah simple WebSocket client untuk streaming realtime XAUUSD prices. Tidak ada trading logic, Telegram, atau database.
