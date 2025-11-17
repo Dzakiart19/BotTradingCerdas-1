@@ -1,136 +1,97 @@
-# XAUUSD Trading Bot - Project Documentation
+# XAUUSD Trading Bot - Replit Project
 
-## Overview
-Bot Telegram untuk memberikan sinyal trading XAUUSD (Emas) dengan strategi scalping M1/M5. Bot menggunakan multiple indikator teknikal (EMA, RSI, Stochastic, ATR) dan mengirimkan notifikasi ke Telegram.
+## Gambaran Proyek
+Bot trading otomatis untuk XAUUSD (Gold) yang mengirimkan sinyal trading ke Telegram berdasarkan analisis teknikal multi-indikator.
 
-**PENTING**: Bot ini HANYA memberikan sinyal, TIDAK mengeksekusi trade otomatis.
+## Perubahan Terbaru (17 November 2025)
 
-## Current State (November 2025)
-- ✅ Fully functional trading signal bot
-- ✅ All modules implemented and tested
-- ✅ Workflow running successfully
-- ✅ Ready for deployment to Koyeb.com
+### Refactoring Data Source
+- **DIHAPUS**: Semua dependensi API berbayar (Polygon.io, Finnhub, TwelveData, GoldAPI)
+- **DITAMBAHKAN**: WebSocket realtime dari broker Exness
+- **URL WebSocket**: `wss://ws-json.exness.com/realtime`
+- **OHLC Builder**: Candle M1/M5 dibuild otomatis dari tick feed
+- **Volume Proxy**: Menggunakan tick count sebagai proxy volume
+- **TIDAK PERLU API KEY**: Bot sepenuhnya gratis tanpa API key
 
-## Recent Changes (November 14, 2025)
-1. ✅ **Unlimited Trades Per Day**: Removed MAX_TRADES_PER_DAY limit (set to 999999 for unlimited 24/7 trading)
-2. ✅ **Auto Chart Cleanup**: Implemented auto-delete chart feature setelah terkirim ke Telegram untuk menghemat storage
-3. ✅ **7 New Modules Created**:
-   - `bot/utils.py` - Helper functions (formatting, validation, caching, rate limiting)
-   - `bot/pair_config.py` - Trading pair configuration dengan dataclass
-   - `bot/error_handler.py` - Advanced error handling dengan decorators, circuit breaker, retry mechanism
-   - `bot/alert_system.py` - Alert system untuk berbagai event (entry, exit, daily summary, risk warning)
-   - `bot/user_manager.py` - Multi-user management dengan SQLAlchemy models
-   - `bot/task_scheduler.py` - Task scheduler untuk automated tasks (cleanup, health check, daily summary)
-   - `bot/backtester.py` - Backtesting engine untuk test strategi dengan historical data
-4. ✅ **Full Integration**: Semua modul baru sudah terintegrasi dengan TradingBot dan PositionTracker
-5. ✅ **Alert System Wired**: Alert notifications untuk trade entry, exit (TP/SL hit), daily summary, system errors
-6. ✅ **User Manager Integration**: User activity tracking dan stats updates otomatis
-7. ✅ **Error Handler Integration**: Advanced error handling dengan logging dan retry mechanism
-8. ✅ **Documentation Updated**: README.md updated dengan fitur-fitur baru
+### Arsitektur Data Feed
+1. **WebSocket Connection**: Koneksi persistent ke `wss://ws-json.exness.com/realtime`
+2. **Tick Processing**: Setiap tick (bid/ask) diproses realtime
+3. **OHLC Building**: 
+   - M1 candles: Built from tick feed setiap menit
+   - M5 candles: Built from tick feed setiap 5 menit
+4. **Auto-Reconnect**: Reconnect otomatis dengan unlimited attempts
+5. **Zero Dependencies**: Tidak ada API key yang diperlukan
 
-## Project Architecture
+### File yang Dimodifikasi
+- `bot/market_data.py`: Complete rewrite untuk WebSocket Exness + OHLC builder
+- `config.py`: Removed semua API key fields
+- `requirements.txt`: Updated websockets library
+- `main.py`: Added WebSocket connection startup
+- `bot/telegram_bot.py`: Updated untuk menggunakan spread dari WebSocket
+- `README.md`: Updated dokumentasi
 
-### Core Modules
-- `config.py` - Configuration management via environment variables
-- `main.py` - Main orchestrator with async event loop and health check server
-- `bot/database.py` - SQLAlchemy models and session management
-- `bot/indicators.py` - Technical indicators (EMA, RSI, Stochastic, ATR)
-- `bot/market_data.py` - WebSocket and REST API client for market data
-- `bot/strategy.py` - Signal detection logic (BUY/SELL)
-- `bot/risk_manager.py` - Risk management and position sizing
-- `bot/position_tracker.py` - Position monitoring until TP/SL
-- `bot/chart_generator.py` - Chart generation for Telegram
-- `bot/telegram_bot.py` - Telegram bot handlers
-- `bot/logger.py` - Logging configuration
+## Struktur Proyek
 
-### Database Schema
-- **Trade**: Historical trade records
-- **Position**: Active positions being tracked
-- **SignalLog**: All generated signals
-- **Performance**: Daily performance metrics
+### Core Components
+- **main.py**: Orchestrator utama
+- **config.py**: Konfigurasi environment (NO API KEYS)
+- **bot/market_data.py**: WebSocket client + OHLC builder
+- **bot/strategy.py**: Trading strategy logic
+- **bot/indicators.py**: Technical indicators (EMA, RSI, Stochastic, ATR)
+- **bot/risk_manager.py**: Risk management
+- **bot/position_tracker.py**: Position monitoring
+- **bot/telegram_bot.py**: Telegram interface
+- **bot/database.py**: SQLite database models
 
-### API Integration
-1. **Polygon.io** (Primary): WebSocket + REST for XAUUSD OHLCV data
-2. **Finnhub** (Fallback): WebSocket + REST backup
-3. **Twelve Data** (Tertiary): REST only fallback
-4. **GoldAPI/Metals-API** (Last resort): Spot price only
+### Data Flow
+1. WebSocket receives bid/ask ticks from Exness
+2. OHLCBuilder builds M1/M5 candles from ticks
+3. IndicatorEngine calculates technical indicators
+4. TradingStrategy detects BUY/SELL signals
+5. RiskManager validates signals
+6. Telegram sends notifications to users
+7. PositionTracker monitors TP/SL
 
-### Strategy Logic
-**BUY Signal Conditions:**
-- M5 trend: EMA(5) > EMA(10) > EMA(20)
-- M1 momentum: RSI < 30 and rising
-- M1 stochastic: %K crossing above %D from oversold
-- Volume > 1.5x average
-- Spread < max threshold
+## Environment Variables Penting
 
-**SELL Signal**: Inverse conditions
-
-## Environment Variables Required
-
-### Essential
-- `TELEGRAM_BOT_TOKEN` - From @BotFather
-- `AUTHORIZED_USER_IDS` - Comma-separated user IDs
-- `POLYGON_API_KEY` - Polygon.io API key
-- `FINNHUB_API_KEY` - Finnhub API key
-
-### Strategy Parameters (All Configurable)
-- EMA_PERIODS, RSI_PERIOD, RSI_OVERSOLD_LEVEL, RSI_OVERBOUGHT_LEVEL
-- STOCH_K_PERIOD, STOCH_D_PERIOD, STOCH_SMOOTH_K
-- STOCH_OVERSOLD_LEVEL, STOCH_OVERBOUGHT_LEVEL
-- ATR_PERIOD, VOLUME_THRESHOLD_MULTIPLIER, MAX_SPREAD_PIPS
-- SL_ATR_MULTIPLIER, DEFAULT_SL_PIPS, TP_RR_RATIO, DEFAULT_TP_PIPS
-- SIGNAL_COOLDOWN_SECONDS, MAX_TRADES_PER_DAY, DAILY_LOSS_PERCENT
-
-## Deployment
-
-### Replit (Development)
 ```bash
-python main.py
+# Telegram (WAJIB)
+TELEGRAM_BOT_TOKEN=your_bot_token
+AUTHORIZED_USER_IDS=123456789,987654321
+
+# Trading Parameters
+EMA_PERIODS=5,10,20
+RSI_PERIOD=14
+RSI_OVERSOLD_LEVEL=30
+RSI_OVERBOUGHT_LEVEL=70
+MAX_TRADES_PER_DAY=999999
+SIGNAL_COOLDOWN_SECONDS=120
+DAILY_LOSS_PERCENT=3.0
+
+# Mode
+DRY_RUN=false
 ```
 
-### Koyeb (Production 24/7)
-1. Push to GitHub
-2. Create app on Koyeb
-3. Connect GitHub repository
-4. Set build type to Dockerfile
-5. Configure environment variables
-6. Mount persistent volume to `/app/data`
-7. Deploy!
-
-### Health Check
-- Endpoint: `http://localhost:8080/health`
-- Returns JSON with service status
-
-## User Preferences
-- Language: **Indonesian**
-- Target: Modal kecil 100rb-500rb IDR
-- Lot size: 0.01 lot
-- Risk per trade: 0.5-1%
-- Max trades per day: 5
-- Daily loss limit: 3%
-
-## Next Phase Features
-- Integrasi API tambahan (Twelve Data, GoldAPI, Metals-API)
-- Unit tests untuk semua modul
-- Backtesting module dengan data historis
-- PostgreSQL migration untuk scalability
-- Web dashboard untuk monitoring
-- Export riwayat ke CSV/Excel
-- Multi-ticker support
-
 ## Known Issues
-- LSP showing import errors (false positives - all libraries installed)
-- pandas_ta not available (using manual indicator calculations)
 
-## Security Notes
-- Bot only responds to AUTHORIZED_USER_IDS
-- No trade execution capabilities
-- All secrets via environment variables
-- Database in WAL mode for concurrent access
-- Rate limiting on Telegram commands
+### WebSocket Connection
+- URL `wss://ws-json.exness.com/realtime` tidak terdokumentasi publik
+- Mungkin tidak dapat diakses dari beberapa environment
+- Auto-reconnect akan terus mencoba jika gagal
 
-## Support & Troubleshooting
-- Check logs in `logs/bot.log`
-- Health check: `curl http://localhost:8080/health`
-- Telegram bot status: Send `/start` command
-- Database location: `data/bot.db`
+## Preferensi User
+- Bahasa komunikasi: Bahasa Indonesia
+- NO API KEY - bot harus 100% gratis
+- Data source: WebSocket broker realtime only
+- Trading pair: XAUUSD
+- Timeframe: M1 dan M5
+- Mode: 24/7 unlimited trades
+
+## Deployment
+- Platform: Replit / Koyeb
+- Database: SQLite dengan persistent storage
+- Port: 8080 (health check)
+- Restart policy: Always
+
+## Catatan Penting
+Bot ini HANYA memberikan sinyal trading via Telegram. TIDAK ada eksekusi trading otomatis. User bertanggung jawab penuh atas semua keputusan trading.

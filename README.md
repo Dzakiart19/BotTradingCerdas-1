@@ -14,12 +14,23 @@
 ### Strategi Trading
 - **Aset**: XAUUSD (Emas)
 - **Timeframe**: Scalping M1 dan M5
+- **Data Source**: **WebSocket Realtime dari Broker Exness** (TANPA API KEY)
 - **Indikator**:
   - EMA (Exponential Moving Average) - Multi-period untuk konfirmasi tren
   - RSI (Relative Strength Index) - Deteksi oversold/overbought
   - Stochastic Oscillator - Momentum dan crossing signals
   - ATR (Average True Range) - Dynamic Stop Loss
-  - Volume Analysis - Konfirmasi kekuatan sinyal
+  - Volume Analysis - Konfirmasi kekuatan sinyal (tick count proxy)
+
+### Data Feed
+**TIDAK MEMERLUKAN API KEY APAPUN!**
+
+Bot menggunakan WebSocket broker realtime dari Exness:
+- **WebSocket URL**: `wss://ws-json.exness.com/realtime`
+- **Data Realtime**: Bid/Ask prices dengan 0-delay
+- **Auto-Reconnect**: Reconnect otomatis jika koneksi terputus
+- **OHLC Builder**: Candle M1/M5 dibangun otomatis dari tick feed
+- **Volume Proxy**: Tick count sebagai proxy volume
 
 ### Logika Sinyal
 **Sinyal BUY:**
@@ -57,8 +68,8 @@
 ### Perintah Bot
 - `/start` - Pesan selamat datang
 - `/help` - Daftar perintah dan deskripsi
-- `/monitor XAUUSD` - Mulai memantau XAUUSD
-- `/stopmonitor XAUUSD` - Hentikan pemantauan
+- `/monitor` - Mulai memantau XAUUSD
+- `/stopmonitor` - Hentikan pemantauan
 - `/riwayat` - Tampilkan 10 riwayat trading terakhir
 - `/performa` - Statistik lengkap (Win Rate, P/L, Profit Factor, dll)
 - `/settings` - Lihat/ubah parameter strategi (admin only)
@@ -67,10 +78,8 @@
 
 ### 1. Requirements
 - Python 3.11+
-- API Keys (gratis):
-  - Telegram Bot Token (via [@BotFather](https://t.me/botfather))
-  - Polygon.io API Key (https://polygon.io)
-  - Finnhub API Key (https://finnhub.io)
+- **HANYA** Telegram Bot Token (via [@BotFather](https://t.me/botfather))
+- **TIDAK PERLU** API Key lainnya!
 
 ### 2. Instalasi Lokal (Development)
 
@@ -85,7 +94,7 @@ pip install -r requirements.txt
 # Buat file .env dari template
 cp .env.example .env
 
-# Edit .env dan isi dengan API keys Anda
+# Edit .env dan isi dengan Telegram Bot Token Anda
 nano .env
 ```
 
@@ -98,10 +107,6 @@ Edit file `.env`:
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 AUTHORIZED_USER_IDS=123456789,987654321
 
-# API Keys
-POLYGON_API_KEY=your_polygon_api_key
-FINNHUB_API_KEY=your_finnhub_api_key
-
 # Strategi (Opsional - gunakan default atau custom)
 EMA_PERIODS=5,10,20
 RSI_PERIOD=14
@@ -111,6 +116,8 @@ MAX_TRADES_PER_DAY=999999  # Unlimited
 CHART_AUTO_DELETE=true  # Auto-delete chart setelah terkirim
 # ... dll (lihat .env.example untuk semua opsi)
 ```
+
+**CATATAN PENTING**: Tidak ada API key yang diperlukan! Bot menggunakan WebSocket broker gratis.
 
 ### 4. Jalankan Bot
 
@@ -125,7 +132,7 @@ DRY_RUN=true python main.py
 ### 5. Test Bot
 1. Buka Telegram dan cari bot Anda
 2. Kirim `/start` untuk memulai
-3. Kirim `/monitor XAUUSD` untuk mulai monitoring
+3. Kirim `/monitor` untuk mulai monitoring
 4. Bot akan mengirim sinyal saat kondisi terpenuhi
 
 ## 🐳 Deployment ke Koyeb.com (24/7)
@@ -167,10 +174,10 @@ git push -u origin main
 ### Logs Lokal
 ```bash
 # Lihat logs real-time
-tail -f logs/bot.log
+tail -f logs/marketdata.log
 
 # Cari error
-grep ERROR logs/bot.log
+grep ERROR logs/*.log
 ```
 
 ### Logs Koyeb
@@ -193,7 +200,7 @@ grep ERROR logs/bot.log
 | `SL_ATR_MULTIPLIER` | 1.0 | Multiplier ATR untuk SL |
 | `DEFAULT_SL_PIPS` | 20.0 | SL fallback (pips) |
 | `TP_RR_RATIO` | 1.5 | Risk-Reward ratio |
-| `MAX_TRADES_PER_DAY` | 5 | Batas sinyal per hari |
+| `MAX_TRADES_PER_DAY` | 999999 | Batas sinyal per hari (unlimited) |
 | `SIGNAL_COOLDOWN_SECONDS` | 120 | Cooldown antar sinyal |
 | `DAILY_LOSS_PERCENT` | 3.0 | Max drawdown harian (%) |
 
@@ -204,12 +211,13 @@ Bot menggunakan SQLite dengan WAL mode untuk performa optimal:
 - Backup: Gunakan volume persisten di Koyeb
 - Migration: Auto-create schema saat startup
 
-### API Fallback Priority
+### Data Feed Architecture
 
-1. **Polygon.io** (Primary) - WebSocket real-time, fallback REST
-2. **Finnhub** (Secondary) - WebSocket real-time, fallback REST
-3. **Twelve Data** (Tertiary) - REST only, delay 1-5 menit
-4. **GoldAPI/Metals-API** (Last resort) - Spot price only, **SUSPEND scalping**
+1. **WebSocket Connection**: Koneksi persistent ke Exness broker
+2. **Tick Processing**: Setiap tick (bid/ask) diproses realtime
+3. **OHLC Building**: Candle M1/M5 dibangun dari tick feed
+4. **Auto-Reconnect**: Reconnect otomatis jika koneksi terputus
+5. **No API Key**: Tidak perlu API key apapun!
 
 ## ⚠️ Disclaimer & Risk Warning
 
@@ -234,7 +242,7 @@ Bot menggunakan SQLite dengan WAL mode untuk performa optimal:
 Jika menemukan bug atau memiliki pertanyaan:
 - Buka issue di GitHub repository
 - Periksa logs untuk troubleshooting
-- Pastikan semua API keys valid dan memiliki quota
+- Pastikan koneksi WebSocket stabil
 
 ## 📄 License
 

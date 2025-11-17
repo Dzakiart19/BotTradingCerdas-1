@@ -129,7 +129,8 @@ class TradingBot:
                             
                             if can_trade:
                                 current_price = await self.market_data.get_current_price()
-                                spread = 0.5
+                                spread_value = await self.market_data.get_spread()
+                                spread = spread_value if spread_value else 0.5
                                 
                                 is_valid, validation_msg = self.strategy.validate_signal(signal, spread)
                                 

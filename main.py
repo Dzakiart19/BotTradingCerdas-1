@@ -121,6 +121,12 @@ class TradingBotOrchestrator:
         await self.task_scheduler.start()
         logger.info("Task scheduler started")
         
+        market_data_task = asyncio.create_task(self.market_data.connect_websocket())
+        self.tasks.append(market_data_task)
+        logger.info("WebSocket connection task started")
+        
+        await asyncio.sleep(3)
+        
         telegram_task = asyncio.create_task(self.telegram_bot.run())
         self.tasks.append(telegram_task)
         

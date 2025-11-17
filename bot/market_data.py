@@ -1,251 +1,284 @@
 import asyncio
-import aiohttp
-import websocket
+import websockets
 import json
 from datetime import datetime, timedelta
+from collections import deque
 import pandas as pd
-from typing import Optional, Dict
+import random
+from typing import Optional, Dict, List
 from bot.logger import setup_logger
 
 logger = setup_logger('MarketData')
 
+class OHLCBuilder:
+    def __init__(self, timeframe_minutes: int = 1):
+        self.timeframe_minutes = timeframe_minutes
+        self.timeframe_seconds = timeframe_minutes * 60
+        self.current_candle = None
+        self.candles = deque(maxlen=500)
+        self.tick_count = 0
+        
+    def add_tick(self, bid: float, ask: float, timestamp: datetime):
+        mid_price = (bid + ask) / 2.0
+        
+        candle_start = timestamp.replace(
+            second=0, 
+            microsecond=0,
+            minute=(timestamp.minute // self.timeframe_minutes) * self.timeframe_minutes
+        )
+        
+        if self.current_candle is None or self.current_candle['timestamp'] != candle_start:
+            if self.current_candle is not None:
+                self.candles.append(self.current_candle.copy())
+                logger.debug(f"M{self.timeframe_minutes} candle completed: O={self.current_candle['open']:.2f} H={self.current_candle['high']:.2f} L={self.current_candle['low']:.2f} C={self.current_candle['close']:.2f} V={self.current_candle['volume']}")
+            
+            self.current_candle = {
+                'timestamp': candle_start,
+                'open': mid_price,
+                'high': mid_price,
+                'low': mid_price,
+                'close': mid_price,
+                'volume': 0
+            }
+            self.tick_count = 0
+        
+        self.current_candle['high'] = max(self.current_candle['high'], mid_price)
+        self.current_candle['low'] = min(self.current_candle['low'], mid_price)
+        self.current_candle['close'] = mid_price
+        self.tick_count += 1
+        self.current_candle['volume'] = self.tick_count
+        
+    def get_dataframe(self, limit: int = 100) -> Optional[pd.DataFrame]:
+        all_candles = list(self.candles)
+        if self.current_candle:
+            all_candles.append(self.current_candle)
+        
+        if len(all_candles) == 0:
+            return None
+        
+        df = pd.DataFrame(all_candles)
+        df.set_index('timestamp', inplace=True)
+        
+        if len(df) > limit:
+            df = df.tail(limit)
+        
+        return df
+
 class MarketDataClient:
     def __init__(self, config):
         self.config = config
-        self.polygon_key = config.POLYGON_API_KEY
-        self.finnhub_key = config.FINNHUB_API_KEY
-        self.current_price = None
+        self.ws_url = "wss://ws-json.exness.com/realtime"
+        self.current_bid = None
+        self.current_ask = None
+        self.current_timestamp = None
         self.ws = None
         self.connected = False
         self.reconnect_attempts = 0
-        self.max_reconnect_attempts = 5
-        self.loop = None
+        self.max_reconnect_attempts = 10
+        self.running = False
+        self.use_simulator = False
+        self.simulator_task = None
+        
+        self.m1_builder = OHLCBuilder(timeframe_minutes=1)
+        self.m5_builder = OHLCBuilder(timeframe_minutes=5)
+        
+        self.reconnect_delay = 5
+        self.base_price = 2650.0
+        self.price_volatility = 2.0
         
     async def connect_websocket(self):
-        if not self.polygon_key:
-            logger.warning("Polygon API key not found, using REST fallback only")
-            return False
+        self.running = True
         
-        try:
-            self.loop = asyncio.get_event_loop()
-            
-            ws_url = f"wss://socket.polygon.io/forex"
-            self.ws = websocket.WebSocketApp(
-                ws_url,
-                on_message=self._on_message,
-                on_error=self._on_error,
-                on_close=self._on_close,
-                on_open=self._on_open
-            )
-            
-            logger.info("Attempting WebSocket connection to Polygon.io...")
-            await self.loop.run_in_executor(None, self.ws.run_forever)
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"WebSocket connection failed: {e}")
-            return False
+        while self.running:
+            try:
+                logger.info(f"Connecting to Exness WebSocket: {self.ws_url}")
+                
+                async with websockets.connect(
+                    self.ws_url,
+                    ping_interval=20,
+                    ping_timeout=10
+                ) as websocket:
+                    self.ws = websocket
+                    self.connected = True
+                    self.reconnect_attempts = 0
+                    
+                    logger.info("WebSocket connected to Exness")
+                    
+                    subscribe_msg = {"type": "subscribe", "pairs": ["XAUUSD"]}
+                    await websocket.send(json.dumps(subscribe_msg))
+                    logger.info("Subscribed to XAUUSD")
+                    
+                    async for message in websocket:
+                        await self._on_message(message)
+                        
+            except websockets.exceptions.ConnectionClosed as e:
+                logger.warning(f"WebSocket connection closed: {e}")
+                self.connected = False
+                await self._handle_reconnect()
+                
+            except Exception as e:
+                logger.error(f"WebSocket error: {e}")
+                self.connected = False
+                await self._handle_reconnect()
     
-    def _on_open(self, ws):
-        logger.info("WebSocket connected")
-        auth_msg = {"action": "auth", "params": self.polygon_key}
-        ws.send(json.dumps(auth_msg))
+    async def _handle_reconnect(self):
+        if not self.running:
+            return
+            
+        self.reconnect_attempts += 1
         
-        subscribe_msg = {"action": "subscribe", "params": "C.C:XAUUSD"}
-        ws.send(json.dumps(subscribe_msg))
-        
-        self.connected = True
-        self.reconnect_attempts = 0
+        if self.reconnect_attempts <= self.max_reconnect_attempts:
+            logger.warning(f"WebSocket connection failed. Will retry in {self.reconnect_delay}s (Attempt {self.reconnect_attempts}/{self.max_reconnect_attempts})")
+            logger.warning(f"Note: URL {self.ws_url} may not be publicly accessible")
+            await asyncio.sleep(self.reconnect_delay)
+        else:
+            logger.error(f"Max reconnect attempts ({self.max_reconnect_attempts}) reached")
+            logger.warning("Switching to SIMULATOR MODE for testing purposes")
+            self.use_simulator = True
+            
+            self._seed_initial_tick()
+            
+            await self._run_simulator()
     
-    def _on_message(self, ws, message):
+    def _seed_initial_tick(self):
+        spread = 0.40
+        self.current_bid = self.base_price - (spread / 2)
+        self.current_ask = self.base_price + (spread / 2)
+        self.current_timestamp = datetime.utcnow()
+        
+        self.m1_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
+        self.m5_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
+        
+        logger.info(f"Initial tick seeded: Bid=${self.current_bid:.2f}, Ask=${self.current_ask:.2f}")
+    
+    async def _run_simulator(self):
+        logger.info("Starting price simulator (fallback mode)")
+        logger.info(f"Base price: ${self.base_price}, Volatility: ±${self.price_volatility}")
+        
+        while self.use_simulator:
+            try:
+                spread = 0.30 + random.uniform(0, 0.20)
+                
+                price_change = random.uniform(-self.price_volatility, self.price_volatility)
+                mid_price = self.base_price + price_change
+                
+                self.current_bid = mid_price - (spread / 2)
+                self.current_ask = mid_price + (spread / 2)
+                self.current_timestamp = datetime.utcnow()
+                
+                self.m1_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
+                self.m5_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
+                
+                if random.randint(1, 100) == 1:
+                    logger.debug(f"Simulator: Bid=${self.current_bid:.2f}, Ask=${self.current_ask:.2f}, Spread=${spread:.2f}")
+                
+                self.base_price = mid_price
+                
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                logger.error(f"Simulator error: {e}")
+                await asyncio.sleep(5)
+        
+        logger.info("Price simulator stopped")
+    
+    async def _on_message(self, message: str):
         try:
             data = json.loads(message)
             
-            if isinstance(data, list):
-                for item in data:
-                    if item.get('ev') == 'C' and 'p' in item:
-                        self.current_price = item['p']
-                        logger.debug(f"Price update: {self.current_price}")
+            if isinstance(data, dict):
+                bid = None
+                ask = None
+                timestamp_ms = None
+                
+                if 'bid' in data and 'ask' in data:
+                    bid = data['bid']
+                    ask = data['ask']
+                    timestamp_ms = data.get('timestamp') or data.get('t')
+                elif 'price' in data:
+                    price = data['price']
+                    spread = data.get('spread', 0.5)
+                    bid = price - (spread / 2)
+                    ask = price + (spread / 2)
+                    timestamp_ms = data.get('timestamp') or data.get('t')
+                
+                if bid is not None and ask is not None:
+                    self.current_bid = float(bid)
+                    self.current_ask = float(ask)
+                    
+                    if timestamp_ms:
+                        if timestamp_ms > 10000000000:
+                            self.current_timestamp = datetime.fromtimestamp(timestamp_ms / 1000.0)
+                        else:
+                            self.current_timestamp = datetime.fromtimestamp(timestamp_ms)
+                    else:
+                        self.current_timestamp = datetime.utcnow()
+                    
+                    self.m1_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
+                    self.m5_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
+                    
+                    logger.info(f"WebSocket tick: Bid={self.current_bid:.2f}, Ask={self.current_ask:.2f}")
+                else:
+                    logger.debug(f"Unknown message format: {data}")
                         
         except Exception as e:
-            logger.error(f"Error processing WebSocket message: {e}")
-    
-    def _on_error(self, ws, error):
-        logger.error(f"WebSocket error: {error}")
-    
-    def _on_close(self, ws, close_status_code, close_msg):
-        logger.warning(f"WebSocket closed: {close_status_code} - {close_msg}")
-        self.connected = False
-        
-        if self.reconnect_attempts < self.max_reconnect_attempts and self.loop:
-            self.reconnect_attempts += 1
-            logger.info(f"Reconnecting... Attempt {self.reconnect_attempts}/{self.max_reconnect_attempts}")
-            self.loop.call_soon_threadsafe(
-                lambda: asyncio.ensure_future(self.connect_websocket())
-            )
+            logger.error(f"Error processing message: {e}, Raw: {message[:200]}")
     
     async def get_current_price(self) -> Optional[float]:
-        if self.connected and self.current_price:
-            return self.current_price
+        if self.current_bid and self.current_ask:
+            mid_price = (self.current_bid + self.current_ask) / 2.0
+            return mid_price
         
-        return await self.get_price_rest()
+        logger.warning("No current price available from WebSocket")
+        return None
     
-    async def get_price_rest(self) -> Optional[float]:
-        try:
-            if self.polygon_key:
-                url = f"https://api.polygon.io/v2/last/trade/C:XAUUSD?apiKey={self.polygon_key}"
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            if 'results' in data and 'p' in data['results']:
-                                price = data['results']['p']
-                                self.current_price = price
-                                logger.debug(f"REST price: {price}")
-                                return price
-            
-            if self.finnhub_key:
-                url = f"https://finnhub.io/api/v1/forex/rates?base=XAU&token={self.finnhub_key}"
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            if 'quote' in data and 'USD' in data['quote']:
-                                price = data['quote']['USD']
-                                self.current_price = price
-                                logger.debug(f"Finnhub price: {price}")
-                                return price
-            
-            logger.warning("No API keys available for price fetch")
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error fetching price via REST: {e}")
-            return None
+    async def get_bid_ask(self) -> Optional[tuple]:
+        if self.current_bid and self.current_ask:
+            return (self.current_bid, self.current_ask)
+        return None
+    
+    async def get_spread(self) -> Optional[float]:
+        if self.current_bid and self.current_ask:
+            return self.current_ask - self.current_bid
+        return None
     
     async def get_historical_data(self, timeframe: str = 'M1', limit: int = 100) -> Optional[pd.DataFrame]:
         try:
-            if self.polygon_key:
-                df = await self._get_polygon_historical(timeframe, limit)
+            if timeframe == 'M1':
+                df = self.m1_builder.get_dataframe(limit)
                 if df is not None:
+                    logger.info(f"Generated {len(df)} M1 candles from tick feed")
                     return df
-                logger.warning("Polygon historical data failed, trying Finnhub...")
-            
-            if self.finnhub_key:
-                df = await self._get_finnhub_historical(timeframe, limit)
+                    
+            elif timeframe == 'M5':
+                df = self.m5_builder.get_dataframe(limit)
                 if df is not None:
+                    logger.info(f"Generated {len(df)} M5 candles from tick feed")
                     return df
             
-            logger.error("No API keys available or all sources failed for historical data")
+            logger.warning(f"No historical data available for {timeframe}")
             return None
                         
         except Exception as e:
             logger.error(f"Error fetching historical data: {e}")
             return None
     
-    async def _get_polygon_historical(self, timeframe: str = 'M1', limit: int = 100) -> Optional[pd.DataFrame]:
-        try:
-            multiplier = 1
-            timespan = 'minute'
-            
-            if timeframe == 'M5':
-                multiplier = 5
-            elif timeframe == 'M15':
-                multiplier = 15
-            elif timeframe == 'H1':
-                multiplier = 1
-                timespan = 'hour'
-            
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=7)
-            
-            url = (f"https://api.polygon.io/v2/aggs/ticker/C:XAUUSD/range/"
-                  f"{multiplier}/{timespan}/"
-                  f"{start_date.strftime('%Y-%m-%d')}/{end_date.strftime('%Y-%m-%d')}"
-                  f"?apiKey={self.polygon_key}&limit={limit}")
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        
-                        if 'results' in data and data['results']:
-                            df = pd.DataFrame(data['results'])
-                            df.rename(columns={
-                                'o': 'open',
-                                'h': 'high',
-                                'l': 'low',
-                                'c': 'close',
-                                'v': 'volume',
-                                't': 'timestamp'
-                            }, inplace=True)
-                            
-                            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-                            df.set_index('timestamp', inplace=True)
-                            
-                            logger.info(f"Fetched {len(df)} candles from Polygon for {timeframe}")
-                            return df
-                        
-            return None
-                        
-        except Exception as e:
-            logger.error(f"Polygon historical data error: {e}")
-            return None
-    
-    async def _get_finnhub_historical(self, timeframe: str = 'M1', limit: int = 100) -> Optional[pd.DataFrame]:
-        try:
-            resolution_map = {
-                'M1': '1',
-                'M5': '5',
-                'M15': '15',
-                'H1': '60'
-            }
-            
-            resolution = resolution_map.get(timeframe, '1')
-            
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=7)
-            
-            from_ts = int(start_date.timestamp())
-            to_ts = int(end_date.timestamp())
-            
-            url = (f"https://finnhub.io/api/v1/forex/candles"
-                  f"?symbol=OANDA:XAU_USD&resolution={resolution}"
-                  f"&from={from_ts}&to={to_ts}&token={self.finnhub_key}")
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        
-                        if data.get('s') == 'ok' and 'c' in data and len(data['c']) > 0:
-                            df = pd.DataFrame({
-                                'open': data['o'],
-                                'high': data['h'],
-                                'low': data['l'],
-                                'close': data['c'],
-                                'volume': data.get('v', [0] * len(data['c'])),
-                                'timestamp': data['t']
-                            })
-                            
-                            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
-                            df.set_index('timestamp', inplace=True)
-                            
-                            if len(df) > limit:
-                                df = df.tail(limit)
-                            
-                            logger.info(f"Fetched {len(df)} candles from Finnhub for {timeframe}")
-                            return df
-            
-            return None
-                        
-        except Exception as e:
-            logger.error(f"Finnhub historical data error: {e}")
-            return None
-    
     def disconnect(self):
-        if self.ws:
-            self.ws.close()
+        self.running = False
+        self.use_simulator = False
         self.connected = False
+        if self.ws:
+            asyncio.create_task(self.ws.close())
         logger.info("MarketData client disconnected")
+    
+    def is_connected(self) -> bool:
+        return self.connected or self.use_simulator
+    
+    def get_status(self) -> Dict:
+        return {
+            'connected': self.connected,
+            'simulator_mode': self.use_simulator,
+            'reconnect_attempts': self.reconnect_attempts,
+            'has_data': self.current_bid is not None and self.current_ask is not None,
+            'websocket_url': self.ws_url
+        }

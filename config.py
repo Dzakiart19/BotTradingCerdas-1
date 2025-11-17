@@ -7,13 +7,6 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
     AUTHORIZED_USER_IDS = [int(uid.strip()) for uid in os.getenv('AUTHORIZED_USER_IDS', '').split(',') if uid.strip()]
     
-    POLYGON_API_KEY = os.getenv('POLYGON_API_KEY', '')
-    FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', '')
-    TWELVEDATA_API_KEY = os.getenv('TWELVEDATA_API_KEY', '')
-    GOLDAPI_API_KEY = os.getenv('GOLDAPI_API_KEY', '')
-    METALS_API_KEY = os.getenv('METALS_API_KEY', '')
-    METALPRICE_API_KEY = os.getenv('METALPRICE_API_KEY', '')
-    
     EMA_PERIODS = [int(p.strip()) for p in os.getenv('EMA_PERIODS', '5,10,20').split(',')]
     RSI_PERIOD = int(os.getenv('RSI_PERIOD', '14'))
     RSI_OVERSOLD_LEVEL = int(os.getenv('RSI_OVERSOLD_LEVEL', '30'))
