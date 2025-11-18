@@ -213,16 +213,16 @@ class TradingStrategy:
                 trend_strength, trend_desc = self.calculate_trend_strength(indicators)
                 
                 dynamic_tp_ratio = 1.0 + (trend_strength * 1.5)
+                dynamic_tp_ratio = min(dynamic_tp_ratio, 2.5)
                 
-                fixed_risk = self.config.FIXED_RISK_AMOUNT
-                target_profit = fixed_risk * dynamic_tp_ratio
-                min_lot = self.config.LOT_SIZE
+                atr = indicators.get('atr', 1.0)
                 
-                required_sl_pips = fixed_risk / min_lot
-                required_tp_pips = target_profit / min_lot
+                if signal_source == 'auto':
+                    sl_distance = max(atr * self.config.SL_ATR_MULTIPLIER, self.config.DEFAULT_SL_PIPS / self.config.XAUUSD_PIP_VALUE)
+                else:
+                    sl_distance = max(atr * 1.2, 1.0)
                 
-                sl_distance = required_sl_pips / self.config.XAUUSD_PIP_VALUE
-                tp_distance = required_tp_pips / self.config.XAUUSD_PIP_VALUE
+                tp_distance = sl_distance * dynamic_tp_ratio
                 
                 if signal == 'BUY':
                     stop_loss = close - sl_distance
@@ -231,8 +231,14 @@ class TradingStrategy:
                     stop_loss = close + sl_distance
                     take_profit = close - tp_distance
                 
-                expected_profit = target_profit
-                expected_loss = fixed_risk
+                sl_pips = abs(stop_loss - close) * self.config.XAUUSD_PIP_VALUE
+                tp_pips = abs(take_profit - close) * self.config.XAUUSD_PIP_VALUE
+                
+                lot_size = self.config.FIXED_RISK_AMOUNT / sl_pips if sl_pips > 0 else self.config.LOT_SIZE
+                lot_size = max(0.01, min(lot_size, 1.0))
+                
+                expected_loss = self.config.FIXED_RISK_AMOUNT
+                expected_profit = expected_loss * dynamic_tp_ratio
                 
                 logger.info(f"{signal} signal detected ({signal_source}) on {timeframe}")
                 logger.info(f"Trend Strength: {trend_desc} (score: {trend_strength:.2f})")
@@ -251,6 +257,9 @@ class TradingStrategy:
                     'expected_profit': expected_profit,
                     'expected_loss': expected_loss,
                     'rr_ratio': dynamic_tp_ratio,
+                    'lot_size': lot_size,
+                    'sl_pips': sl_pips,
+                    'tp_pips': tp_pips,
                     'indicators': json.dumps({
                         'ema_short': float(ema_short) if ema_short is not None else None,
                         'ema_mid': float(ema_mid) if ema_mid is not None else None,

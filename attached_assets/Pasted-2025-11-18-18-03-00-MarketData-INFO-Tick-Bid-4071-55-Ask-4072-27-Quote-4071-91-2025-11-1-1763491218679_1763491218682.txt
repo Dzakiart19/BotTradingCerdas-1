@@ -1,0 +1,200 @@
+2025-11-18 18:03:00 - MarketData - INFO - 💰 Tick: Bid=4071.55, Ask=4072.27, Quote=4071.91
+2025-11-18 18:03:00 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:00 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:01 - MarketData - INFO - 💰 Tick: Bid=4071.39, Ask=4072.11, Quote=4071.75
+2025-11-18 18:03:01 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:01 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:02 - MarketData - INFO - 💰 Tick: Bid=4071.41, Ask=4072.11, Quote=4071.76
+2025-11-18 18:03:02 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:02 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:03 - MarketData - INFO - 💰 Tick: Bid=4071.51, Ask=4072.24, Quote=4071.88
+2025-11-18 18:03:03 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:03 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:04 - MarketData - INFO - 💰 Tick: Bid=4071.59, Ask=4072.30, Quote=4071.95
+2025-11-18 18:03:04 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:04 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:05 - MarketData - INFO - 💰 Tick: Bid=4071.71, Ask=4072.42, Quote=4072.07
+2025-11-18 18:03:05 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:05 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:06 - MarketData - INFO - 💰 Tick: Bid=4071.51, Ask=4072.21, Quote=4071.86
+2025-11-18 18:03:06 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:06 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:07 - MarketData - INFO - 💰 Tick: Bid=4071.70, Ask=4072.41, Quote=4072.06
+2025-11-18 18:03:07 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:07 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:08 - MarketData - INFO - 💰 Tick: Bid=4071.83, Ask=4072.55, Quote=4072.19
+2025-11-18 18:03:08 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:08 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:09 - MarketData - INFO - 💰 Tick: Bid=4071.79, Ask=4072.51, Quote=4072.15
+2025-11-18 18:03:09 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:09 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:10 - MarketData - INFO - 💰 Tick: Bid=4071.85, Ask=4072.58, Quote=4072.22
+2025-11-18 18:03:10 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:10 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:11 - MarketData - INFO - 💰 Tick: Bid=4071.85, Ask=4072.58, Quote=4072.22
+2025-11-18 18:03:11 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:11 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:12 - MarketData - INFO - 💰 Tick: Bid=4071.87, Ask=4072.57, Quote=4072.22
+2025-11-18 18:03:12 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:12 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:13 - MarketData - INFO - 💰 Tick: Bid=4071.90, Ask=4072.61, Quote=4072.26
+2025-11-18 18:03:13 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:13 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:14 - MarketData - INFO - 💰 Tick: Bid=4071.88, Ask=4072.57, Quote=4072.23
+2025-11-18 18:03:14 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:14 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:15 - MarketData - INFO - 💰 Tick: Bid=4071.90, Ask=4072.54, Quote=4072.22
+2025-11-18 18:03:15 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:15 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:16 - MarketData - INFO - 💰 Tick: Bid=4071.77, Ask=4072.42, Quote=4072.10
+2025-11-18 18:03:16 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:16 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:17 - MarketData - INFO - 💰 Tick: Bid=4071.77, Ask=4072.43, Quote=4072.10
+2025-11-18 18:03:17 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:17 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:18 - MarketData - INFO - 💰 Tick: Bid=4071.45, Ask=4072.15, Quote=4071.80
+2025-11-18 18:03:18 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:18 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:19 - MarketData - INFO - 💰 Tick: Bid=4071.67, Ask=4072.28, Quote=4071.98
+2025-11-18 18:03:19 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:19 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:20 - MarketData - INFO - 💰 Tick: Bid=4071.71, Ask=4072.40, Quote=4072.06
+2025-11-18 18:03:20 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:20 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:21 - MarketData - INFO - 💰 Tick: Bid=4071.66, Ask=4072.34, Quote=4072.00
+2025-11-18 18:03:21 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:21 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:22 - MarketData - INFO - 💰 Tick: Bid=4071.63, Ask=4072.27, Quote=4071.95
+2025-11-18 18:03:22 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:22 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:23 - MarketData - INFO - 💰 Tick: Bid=4071.63, Ask=4072.27, Quote=4071.95
+2025-11-18 18:03:23 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:23 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:24 - MarketData - INFO - 💰 Tick: Bid=4071.63, Ask=4072.25, Quote=4071.94
+2025-11-18 18:03:24 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:24 - MarketData - INFO - Generated 100 M1 candles from tick feed
+No traffic detected in the past hour. Transitioning to deep sleep.
+2025-11-18 18:03:25 - MarketData - INFO - 💰 Tick: Bid=4071.52, Ask=4072.19, Quote=4071.86
+2025-11-18 18:03:25 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:25 - MarketData - INFO - Generated 100 M1 candles from tick feed
+Instance is stopping.
+2025-11-18 18:03:26 - MarketData - INFO - 💰 Tick: Bid=4071.52, Ask=4072.15, Quote=4071.84
+2025-11-18 18:03:26 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:26 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:27 - MarketData - INFO - 💰 Tick: Bid=4071.33, Ask=4072.04, Quote=4071.69
+2025-11-18 18:03:27 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:27 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:28 - MarketData - INFO - 💰 Tick: Bid=4071.60, Ask=4072.27, Quote=4071.94
+2025-11-18 18:03:28 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:28 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:29 - MarketData - INFO - 💰 Tick: Bid=4072.16, Ask=4072.92, Quote=4072.54
+2025-11-18 18:03:29 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:29 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:30 - MarketData - INFO - 💰 Tick: Bid=4072.10, Ask=4072.83, Quote=4072.47
+2025-11-18 18:03:30 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:30 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:31 - MarketData - INFO - 💰 Tick: Bid=4072.03, Ask=4072.73, Quote=4072.38
+2025-11-18 18:03:31 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:31 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:32 - MarketData - INFO - 💰 Tick: Bid=4072.14, Ask=4072.82, Quote=4072.48
+2025-11-18 18:03:32 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:32 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:33 - MarketData - INFO - 💰 Tick: Bid=4071.94, Ask=4072.66, Quote=4072.30
+2025-11-18 18:03:33 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:33 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:34 - MarketData - INFO - 💰 Tick: Bid=4072.09, Ask=4072.71, Quote=4072.40
+2025-11-18 18:03:34 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:34 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:35 - MarketData - INFO - 💰 Tick: Bid=4072.02, Ask=4072.71, Quote=4072.37
+2025-11-18 18:03:35 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:35 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:36 - MarketData - INFO - 💰 Tick: Bid=4072.14, Ask=4072.85, Quote=4072.50
+2025-11-18 18:03:36 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:36 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:37 - MarketData - INFO - 💰 Tick: Bid=4072.05, Ask=4072.73, Quote=4072.39
+2025-11-18 18:03:37 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:37 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:38 - MarketData - INFO - 💰 Tick: Bid=4071.95, Ask=4072.64, Quote=4072.30
+2025-11-18 18:03:38 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:38 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:39 - MarketData - INFO - 💰 Tick: Bid=4071.79, Ask=4072.48, Quote=4072.14
+2025-11-18 18:03:39 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:39 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:40 - MarketData - INFO - 💰 Tick: Bid=4071.84, Ask=4072.48, Quote=4072.16
+2025-11-18 18:03:40 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:40 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:41 - MarketData - INFO - 💰 Tick: Bid=4071.79, Ask=4072.46, Quote=4072.13
+2025-11-18 18:03:41 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:41 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:42 - MarketData - INFO - 💰 Tick: Bid=4071.80, Ask=4072.46, Quote=4072.13
+2025-11-18 18:03:42 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:42 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:43 - MarketData - INFO - 💰 Tick: Bid=4071.60, Ask=4072.23, Quote=4071.92
+2025-11-18 18:03:43 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:43 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:44 - MarketData - INFO - 💰 Tick: Bid=4071.32, Ask=4071.98, Quote=4071.65
+2025-11-18 18:03:44 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:44 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:45 - MarketData - INFO - 💰 Tick: Bid=4071.07, Ask=4071.85, Quote=4071.46
+2025-11-18 18:03:45 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:45 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:46 - MarketData - INFO - 💰 Tick: Bid=4071.13, Ask=4071.78, Quote=4071.46
+2025-11-18 18:03:46 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:46 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:47 - MarketData - INFO - 💰 Tick: Bid=4071.10, Ask=4071.77, Quote=4071.44
+2025-11-18 18:03:47 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:47 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:48 - MarketData - INFO - 💰 Tick: Bid=4071.02, Ask=4071.76, Quote=4071.39
+2025-11-18 18:03:48 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:48 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:49 - MarketData - INFO - 💰 Tick: Bid=4071.16, Ask=4071.81, Quote=4071.49
+2025-11-18 18:03:49 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:49 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:50 - MarketData - INFO - 💰 Tick: Bid=4070.97, Ask=4071.71, Quote=4071.34
+2025-11-18 18:03:50 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:50 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:51 - MarketData - INFO - 💰 Tick: Bid=4070.72, Ask=4071.40, Quote=4071.06
+2025-11-18 18:03:51 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:51 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:52 - MarketData - INFO - 💰 Tick: Bid=4070.75, Ask=4071.41, Quote=4071.08
+2025-11-18 18:03:52 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:52 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:53 - MarketData - INFO - 💰 Tick: Bid=4070.77, Ask=4071.44, Quote=4071.11
+2025-11-18 18:03:53 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:53 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:54 - MarketData - INFO - 💰 Tick: Bid=4070.74, Ask=4071.41, Quote=4071.08
+2025-11-18 18:03:54 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:54 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:54 - Main - INFO - Received signal 15
+2025-11-18 18:03:54 - Main - INFO - ============================================================
+2025-11-18 18:03:54 - Main - INFO - SHUTTING DOWN BOT...
+2025-11-18 18:03:54 - Main - INFO - ============================================================
+2025-11-18 18:03:55 - MarketData - INFO - 💰 Tick: Bid=4070.77, Ask=4071.49, Quote=4071.13
+2025-11-18 18:03:55 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:55 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:55 - Main - INFO - Stopping Telegram bot...
+2025-11-18 18:03:55 - TelegramBot - INFO - Stopping Telegram bot polling...
+2025-11-18 18:03:56 - MarketData - INFO - 💰 Tick: Bid=4071.08, Ask=4071.71, Quote=4071.40
+2025-11-18 18:03:56 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:56 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:57 - MarketData - INFO - 💰 Tick: Bid=4071.15, Ask=4071.87, Quote=4071.51
+2025-11-18 18:03:57 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:57 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:58 - MarketData - INFO - 💰 Tick: Bid=4071.07, Ask=4071.75, Quote=4071.41
+2025-11-18 18:03:58 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:58 - MarketData - INFO - Generated 100 M1 candles from tick feed
+2025-11-18 18:03:58 - TelegramBot - INFO - Telegram bot polling stopped
+2025-11-18 18:03:58 - TelegramBot - INFO - Telegram bot application stopped
+2025-11-18 18:03:58 - TelegramBot - INFO - Telegram bot application shutdown complete
+2025-11-18 18:03:58 - Main - INFO - Stopping position tracker...
+2025-11-18 18:03:58 - PositionTracker - INFO - Position monitoring stopped
+2025-11-18 18:03:58 - Main - INFO - Stopping task scheduler...
+2025-11-18 18:03:58 - TaskScheduler - INFO - Task scheduler stopped
+2025-11-18 18:03:58 - Main - INFO - Stopping market data connection...
+2025-11-18 18:03:58 - MarketData - INFO - MarketData client disconnected
+2025-11-18 18:03:58 - Main - INFO - Closing database connections...
+2025-11-18 18:03:58 - Main - INFO - Stopping health server...
+2025-11-18 18:03:58 - Main - INFO - ============================================================
+2025-11-18 18:03:58 - Main - INFO - BOT SHUTDOWN COMPLETE
+2025-11-18 18:03:58 - Main - INFO - ============================================================
+Instance stopped.

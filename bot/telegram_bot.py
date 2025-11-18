@@ -258,8 +258,9 @@ class TradingBot:
             trade_id = trade.id
             session.close()
             
-            sl_pips = abs(signal['entry_price'] - signal['stop_loss']) * self.config.XAUUSD_PIP_VALUE
-            tp_pips = abs(signal['entry_price'] - signal['take_profit']) * self.config.XAUUSD_PIP_VALUE
+            sl_pips = signal.get('sl_pips', abs(signal['entry_price'] - signal['stop_loss']) * self.config.XAUUSD_PIP_VALUE)
+            tp_pips = signal.get('tp_pips', abs(signal['entry_price'] - signal['take_profit']) * self.config.XAUUSD_PIP_VALUE)
+            lot_size = signal.get('lot_size', self.config.LOT_SIZE)
             
             source_icon = "🤖" if signal_source == 'auto' else "👤"
             source_text = "OTOMATIS" if signal_source == 'auto' else "MANUAL"
@@ -277,7 +278,8 @@ class TradingBot:
                 f"*Trend Strength:* {trend_desc}\n\n"
                 f"*Entry:* ${signal['entry_price']:.2f}\n"
                 f"*Stop Loss:* ${signal['stop_loss']:.2f} ({sl_pips:.1f} pips)\n"
-                f"*Take Profit:* ${signal['take_profit']:.2f} ({tp_pips:.1f} pips)\n\n"
+                f"*Take Profit:* ${signal['take_profit']:.2f} ({tp_pips:.1f} pips)\n"
+                f"*Lot Size:* {lot_size:.2f} lot\n\n"
                 f"💰 *Risk Management:*\n"
                 f"• Max Loss: ${expected_loss:.2f}\n"
                 f"• Target Profit: ${expected_profit:.2f}\n"
