@@ -205,30 +205,22 @@ class TradingBot:
             trade_id = trade.id
             session.close()
             
-            estimated_pl = self.risk_manager.calculate_pl(
-                signal['entry_price'],
-                signal['take_profit'],
-                signal['signal']
-            )
-            
             sl_pips = abs(signal['entry_price'] - signal['stop_loss']) * self.config.XAUUSD_PIP_VALUE
             tp_pips = abs(signal['entry_price'] - signal['take_profit']) * self.config.XAUUSD_PIP_VALUE
             
             msg = (
-                f"🚨 *{signal['signal']} SIGNAL*\n\n"
+                f"🚨 *SINYAL {signal['signal']}*\n\n"
                 f"*Ticker:* XAUUSD\n"
                 f"*Timeframe:* {signal['timeframe']}\n"
                 f"*Entry:* ${signal['entry_price']:.2f}\n"
                 f"*Stop Loss:* ${signal['stop_loss']:.2f} ({sl_pips:.1f} pips)\n"
                 f"*Take Profit:* ${signal['take_profit']:.2f} ({tp_pips:.1f} pips)\n"
-                f"*Estimated P/L:* ${estimated_pl:.2f}\n\n"
-                f"*Confidence:* {', '.join(signal.get('confidence_reasons', []))}\n"
             )
             
             if self.app and self.app.bot:
                 await self.app.bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown')
                 
-                if df is not None:
+                if df is not None and len(df) >= 30:
                     chart_path = self.chart_generator.generate_chart(df, signal, signal['timeframe'])
                     if chart_path:
                         with open(chart_path, 'rb') as photo:
@@ -238,6 +230,10 @@ class TradingBot:
                             await asyncio.sleep(2)
                             self.chart_generator.delete_chart(chart_path)
                             logger.info(f"Auto-deleted chart after sending: {chart_path}")
+                    else:
+                        logger.warning(f"Chart generation failed for {signal['signal']} signal")
+                else:
+                    logger.info(f"Skipping chart - insufficient candles ({len(df) if df is not None else 0}/30)")
             
             await self.position_tracker.add_position(
                 trade_id,
@@ -246,15 +242,7 @@ class TradingBot:
                 signal['stop_loss'],
                 signal['take_profit']
             )
-            
-            if self.alert_system:
-                await self.alert_system.send_trade_entry_alert({
-                    'signal_type': signal['signal'],
-                    'entry_price': signal['entry_price'],
-                    'stop_loss': signal['stop_loss'],
-                    'take_profit': signal['take_profit'],
-                    'timeframe': signal['timeframe']
-                })
+            logger.info(f"Position {trade_id} added to tracker: {signal['signal']} @ ${signal['entry_price']:.2f}")
             
         except Exception as e:
             logger.error(f"Error sending signal: {e}")
@@ -396,6 +384,9 @@ class TradingBot:
             }
             
             df_m1 = await self.market_data.get_historical_data('M1', 100)
+            
+            if df_m1 is None or len(df_m1) < 30:
+                logger.info("Not enough local candles for chart, will proceed without chart")
             
             await self._send_signal(update.effective_chat.id, signal, df_m1)
             
