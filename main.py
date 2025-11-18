@@ -263,6 +263,10 @@ class TradingBotOrchestrator:
                     except Exception as e:
                         logger.error(f"Failed to send shutdown message: {e}")
             
+            logger.info("Stopping Telegram bot...")
+            if self.telegram_bot:
+                await self.telegram_bot.stop()
+            
             logger.info("Stopping position tracker...")
             if self.position_tracker:
                 self.position_tracker.stop_monitoring()
@@ -274,11 +278,6 @@ class TradingBotOrchestrator:
             logger.info("Stopping market data connection...")
             if self.market_data:
                 self.market_data.disconnect()
-            
-            logger.info("Stopping Telegram bot...")
-            if self.telegram_bot and self.telegram_bot.app:
-                await self.telegram_bot.app.stop()
-                await self.telegram_bot.app.shutdown()
             
             logger.info("Closing database connections...")
             if self.db_manager:

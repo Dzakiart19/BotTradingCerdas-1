@@ -728,3 +728,27 @@ class TradingBot:
         logger.info("Starting Telegram bot polling...")
         await self.app.updater.start_polling()
         logger.info("Telegram bot is running!")
+    
+    async def stop(self):
+        if not self.app:
+            return
+        
+        logger.info("Stopping Telegram bot polling...")
+        try:
+            if self.app.updater and self.app.updater.running:
+                await self.app.updater.stop()
+                logger.info("Telegram bot polling stopped")
+        except Exception as e:
+            logger.error(f"Error stopping updater: {e}")
+        
+        try:
+            await self.app.stop()
+            logger.info("Telegram bot application stopped")
+        except Exception as e:
+            logger.error(f"Error stopping app: {e}")
+        
+        try:
+            await self.app.shutdown()
+            logger.info("Telegram bot application shutdown complete")
+        except Exception as e:
+            logger.error(f"Error shutting down app: {e}")
