@@ -96,7 +96,7 @@ class TradingBot:
             return
         
         self.monitoring = True
-        await update.message.reply_text("✅ Monitoring dimulai! Mencari sinyal trading...")
+        await update.message.reply_text("✅ Monitoring dimulai! Bot akan mendeteksi sinyal secara real-time...")
         
         asyncio.create_task(self._monitoring_loop(update.effective_chat.id))
     
@@ -112,44 +112,61 @@ class TradingBot:
         await update.message.reply_text("🛑 Monitoring dihentikan.")
     
     async def _monitoring_loop(self, chat_id: int):
-        while self.monitoring:
-            try:
-                df_m1 = await self.market_data.get_historical_data('M1', 100)
-                
-                if df_m1 is not None and len(df_m1) >= 50:
-                    from bot.indicators import IndicatorEngine
-                    indicator_engine = IndicatorEngine(self.config)
-                    indicators = indicator_engine.get_indicators(df_m1)
+        tick_queue = await self.market_data.subscribe_ticks('telegram_bot')
+        logger.info("Monitoring loop subscribed ke tick feed - mode real-time aktif")
+        
+        last_signal_check = datetime.now() - timedelta(seconds=self.config.SIGNAL_COOLDOWN_SECONDS)
+        
+        try:
+            while self.monitoring:
+                try:
+                    tick = await tick_queue.get()
                     
-                    if indicators:
-                        signal = self.strategy.detect_signal(indicators, 'M1')
+                    now = datetime.now()
+                    time_since_last_check = (now - last_signal_check).total_seconds()
+                    
+                    if time_since_last_check < self.config.SIGNAL_COOLDOWN_SECONDS:
+                        continue
+                    
+                    df_m1 = await self.market_data.get_historical_data('M1', 100)
+                    
+                    if df_m1 is not None and len(df_m1) >= 50:
+                        from bot.indicators import IndicatorEngine
+                        indicator_engine = IndicatorEngine(self.config)
+                        indicators = indicator_engine.get_indicators(df_m1)
                         
-                        if signal:
-                            can_trade, rejection_reason = self.risk_manager.can_trade(signal['signal'])
+                        if indicators:
+                            signal = self.strategy.detect_signal(indicators, 'M1')
                             
-                            if can_trade:
-                                current_price = await self.market_data.get_current_price()
-                                spread_value = await self.market_data.get_spread()
-                                spread = spread_value if spread_value else 0.5
+                            if signal:
+                                can_trade, rejection_reason = self.risk_manager.can_trade(signal['signal'])
                                 
-                                is_valid, validation_msg = self.strategy.validate_signal(signal, spread)
-                                
-                                if is_valid:
-                                    await self._send_signal(chat_id, signal, df_m1)
-                                    self.risk_manager.record_signal()
+                                if can_trade:
+                                    current_price = await self.market_data.get_current_price()
+                                    spread_value = await self.market_data.get_spread()
+                                    spread = spread_value if spread_value else 0.5
                                     
-                                    if self.user_manager:
-                                        self.user_manager.update_user_activity(chat_id)
+                                    is_valid, validation_msg = self.strategy.validate_signal(signal, spread)
+                                    
+                                    if is_valid:
+                                        await self._send_signal(chat_id, signal, df_m1)
+                                        self.risk_manager.record_signal()
+                                        last_signal_check = now
+                                        
+                                        if self.user_manager:
+                                            self.user_manager.update_user_activity(chat_id)
+                                    else:
+                                        logger.info(f"Signal validation failed: {validation_msg}")
                                 else:
-                                    logger.info(f"Signal validation failed: {validation_msg}")
-                            else:
-                                logger.info(f"Trade rejected: {rejection_reason}")
-                
-                await asyncio.sleep(30)
-                
-            except Exception as e:
-                logger.error(f"Error in monitoring loop: {e}")
-                await asyncio.sleep(60)
+                                    logger.info(f"Trade rejected: {rejection_reason}")
+                    
+                except Exception as e:
+                    logger.error(f"Error processing tick dalam monitoring loop: {e}")
+                    await asyncio.sleep(1)
+                    
+        finally:
+            await self.market_data.unsubscribe_ticks('telegram_bot')
+            logger.info("Monitoring loop unsubscribed dari tick feed")
     
     async def _send_signal(self, chat_id: int, signal: dict, df: Optional[pd.DataFrame] = None):
         try:

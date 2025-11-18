@@ -89,6 +89,32 @@ class MarketDataClient:
         self.base_price = 2650.0
         self.price_volatility = 2.0
         
+        self.subscribers = {}
+        logger.info("Pub/Sub mechanism initialized")
+    
+    async def subscribe_ticks(self, name: str) -> asyncio.Queue:
+        queue = asyncio.Queue(maxsize=100)
+        self.subscribers[name] = queue
+        logger.info(f"Subscriber '{name}' registered untuk tick feed")
+        return queue
+    
+    async def unsubscribe_ticks(self, name: str):
+        if name in self.subscribers:
+            del self.subscribers[name]
+            logger.info(f"Subscriber '{name}' unregistered dari tick feed")
+    
+    async def _broadcast_tick(self, tick_data: Dict):
+        if not self.subscribers:
+            return
+        
+        for name, queue in list(self.subscribers.items()):
+            try:
+                queue.put_nowait(tick_data)
+            except asyncio.QueueFull:
+                logger.warning(f"Queue full untuk subscriber '{name}', skipping tick")
+            except Exception as e:
+                logger.error(f"Error broadcasting tick ke '{name}': {e}")
+        
     async def connect_websocket(self):
         self.running = True
         
@@ -189,9 +215,18 @@ class MarketDataClient:
                 self.current_bid = mid_price - (spread / 2)
                 self.current_ask = mid_price + (spread / 2)
                 self.current_timestamp = datetime.utcnow()
+                self.current_quote = mid_price
                 
                 self.m1_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
                 self.m5_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
+                
+                tick_data = {
+                    'bid': self.current_bid,
+                    'ask': self.current_ask,
+                    'quote': self.current_quote,
+                    'timestamp': self.current_timestamp
+                }
+                await self._broadcast_tick(tick_data)
                 
                 if random.randint(1, 100) == 1:
                     logger.debug(f"Simulator: Bid=${self.current_bid:.2f}, Ask=${self.current_ask:.2f}, Spread=${spread:.2f}")
@@ -228,6 +263,14 @@ class MarketDataClient:
                         self.m5_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
                         
                         logger.info(f"💰 Tick: Bid={self.current_bid:.2f}, Ask={self.current_ask:.2f}, Quote={self.current_quote:.2f}")
+                        
+                        tick_data = {
+                            'bid': self.current_bid,
+                            'ask': self.current_ask,
+                            'quote': self.current_quote,
+                            'timestamp': self.current_timestamp
+                        }
+                        await self._broadcast_tick(tick_data)
                     
                 elif "pong" in data:
                     logger.debug("Pong received")

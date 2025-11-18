@@ -149,26 +149,32 @@ class PositionTracker:
         finally:
             session.close()
     
-    async def monitor_positions(self, price_feed_callback):
-        self.monitoring = True
-        logger.info("Position monitoring started")
+    async def monitor_positions(self, market_data_client):
+        tick_queue = await market_data_client.subscribe_ticks('position_tracker')
+        logger.info("Position tracker subscribed ke tick feed - monitoring real-time aktif")
         
-        while self.monitoring:
-            try:
-                if self.active_positions:
-                    current_price = await price_feed_callback()
+        self.monitoring = True
+        
+        try:
+            while self.monitoring:
+                try:
+                    tick = await tick_queue.get()
                     
-                    if current_price:
+                    if self.active_positions:
+                        mid_price = tick['quote']
+                        
                         for position_id in list(self.active_positions.keys()):
-                            result = await self.update_position(position_id, current_price)
+                            result = await self.update_position(position_id, mid_price)
                             if result:
-                                logger.info(f"Position {position_id} closed: {result}")
-                
-                await asyncio.sleep(1)
-                
-            except Exception as e:
-                logger.error(f"Error in position monitoring: {e}")
-                await asyncio.sleep(5)
+                                logger.info(f"✅ Position {position_id} ditutup: {result}")
+                    
+                except Exception as e:
+                    logger.error(f"Error processing tick dalam position monitoring: {e}")
+                    await asyncio.sleep(1)
+                    
+        finally:
+            await market_data_client.unsubscribe_ticks('position_tracker')
+            logger.info("Position tracker unsubscribed dari tick feed")
     
     def stop_monitoring(self):
         self.monitoring = False
