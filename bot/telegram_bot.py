@@ -28,15 +28,20 @@ class TradingBot:
         self.monitoring = False
         
     def is_authorized(self, user_id: int) -> bool:
+        if self.user_manager:
+            return self.user_manager.has_access(user_id)
+        
         if not self.config.AUTHORIZED_USER_IDS:
             return True
         return user_id in self.config.AUTHORIZED_USER_IDS
     
+    def is_admin(self, user_id: int) -> bool:
+        if self.user_manager:
+            user = self.user_manager.get_user(user_id)
+            return user.is_admin if user else False
+        return user_id in self.config.AUTHORIZED_USER_IDS
+    
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.is_authorized(update.effective_user.id):
-            await update.message.reply_text("⛔ Anda tidak memiliki akses ke bot ini.")
-            return
-        
         if self.user_manager:
             self.user_manager.create_user(
                 telegram_id=update.effective_user.id,
@@ -46,19 +51,42 @@ class TradingBot:
             )
             self.user_manager.update_user_activity(update.effective_user.id)
         
+        if not self.is_authorized(update.effective_user.id):
+            await update.message.reply_text("⛔ Anda tidak memiliki akses ke bot ini.")
+            return
+        
+        user_status = "Admin (Unlimited)" if self.is_admin(update.effective_user.id) else "User Premium"
+        mode = "LIVE" if not self.config.DRY_RUN else "DRY RUN"
+        
         welcome_msg = (
-            "🤖 *XAUUSD Trading Bot*\n\n"
-            "Bot trading otomatis untuk XAUUSD dengan analisis teknikal.\n\n"
+            "🤖 *XAUUSD Trading Bot Pro*\n\n"
+            "Bot trading otomatis untuk XAUUSD dengan analisis teknikal canggih.\n\n"
+            f"👑 Status: {user_status}\n\n"
             "*Commands:*\n"
             "/start - Tampilkan pesan ini\n"
             "/help - Bantuan lengkap\n"
-            "/monitor - Mulai monitoring sinyal trading\n"
+            "/langganan - Cek status langganan\n"
+            "/monitor - Mulai monitoring sinyal\n"
             "/stopmonitor - Stop monitoring\n"
-            "/getsignal - Dapatkan sinyal manual sekarang\n"
+            "/getsignal - Dapatkan sinyal manual\n"
             "/riwayat - Lihat riwayat trading\n"
             "/performa - Statistik performa\n"
-            "/settings - Lihat konfigurasi\n\n"
-            f"*Mode:* {'DRY RUN (Simulasi)' if self.config.DRY_RUN else 'LIVE'}\n"
+            "/settings - Lihat konfigurasi\n"
+        )
+        
+        if self.is_admin(update.effective_user.id):
+            welcome_msg += (
+                "\n*Admin Commands:*\n"
+                "/riset - Reset database trading\n"
+                "/addpremium - Tambah premium user\n"
+            )
+        
+        welcome_msg += f"\n*Mode:* {mode}\n"
+        welcome_msg += (
+            "\n💎 *Paket Premium:*\n"
+            "• 1 Minggu: Rp 15.000\n"
+            "• 1 Bulan: Rp 30.000\n"
+            "Hubungi: @dzeckyete\n"
         )
         
         await update.message.reply_text(welcome_msg, parse_mode='Markdown')
@@ -423,6 +451,133 @@ class TradingBot:
         
         await update.message.reply_text(msg, parse_mode='Markdown')
     
+    async def langganan_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if self.user_manager:
+            self.user_manager.create_user(
+                telegram_id=update.effective_user.id,
+                username=update.effective_user.username,
+                first_name=update.effective_user.first_name,
+                last_name=update.effective_user.last_name
+            )
+        
+        if not self.is_authorized(update.effective_user.id):
+            await update.message.reply_text("⛔ Anda tidak memiliki akses ke bot ini.")
+            return
+        
+        if self.user_manager:
+            status = self.user_manager.get_subscription_status(update.effective_user.id)
+            
+            if status:
+                if status['tier'] == 'ADMIN':
+                    msg = (
+                        "💎 *Status Langganan*\n\n"
+                        f"👑 Tier: {status['tier']}\n"
+                        f"✅ Status: {status['status']}\n\n"
+                        "Anda memiliki akses unlimited sebagai admin!"
+                    )
+                elif status['status'] == 'Aktif':
+                    msg = (
+                        "💎 *Status Langganan*\n\n"
+                        f"📦 Tier: {status['tier']}\n"
+                        f"✅ Status: {status['status']}\n"
+                        f"📅 Berakhir: {status['expires']}\n"
+                        f"⏰ Sisa: {status['days_left']} hari\n\n"
+                        "Untuk perpanjang, hubungi @dzeckyete"
+                    )
+                else:
+                    msg = (
+                        "💎 *Status Langganan*\n\n"
+                        f"📦 Tier: {status['tier']}\n"
+                        f"❌ Status: {status['status']}\n\n"
+                        "*Paket Premium:*\n"
+                        "• 1 Minggu: Rp 15.000\n"
+                        "• 1 Bulan: Rp 30.000\n\n"
+                        "Hubungi @dzeckyete untuk berlangganan!"
+                    )
+                
+                await update.message.reply_text(msg, parse_mode='Markdown')
+            else:
+                await update.message.reply_text("❌ Gagal mengambil status langganan.")
+        else:
+            await update.message.reply_text("❌ User manager tidak tersedia.")
+    
+    async def riset_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.is_admin(update.effective_user.id):
+            await update.message.reply_text("⛔ Command ini hanya untuk admin.")
+            return
+        
+        try:
+            session = self.db.get_session()
+            
+            session.query(Trade).delete()
+            session.query(Position).delete()
+            session.query(Performance).delete()
+            session.commit()
+            session.close()
+            
+            await update.message.reply_text("✅ Database trading berhasil direset!")
+            logger.info(f"Database reset by admin: {update.effective_user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error resetting database: {e}")
+            await update.message.reply_text(f"❌ Error: {str(e)}")
+    
+    async def addpremium_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.is_admin(update.effective_user.id):
+            await update.message.reply_text("⛔ Command ini hanya untuk admin.")
+            return
+        
+        if not context.args or len(context.args) < 2:
+            await update.message.reply_text(
+                "❌ Format salah!\n\n"
+                "*Penggunaan:*\n"
+                "/addpremium <user_id> <durasi>\n\n"
+                "*Durasi:*\n"
+                "• 1week - 1 Minggu\n"
+                "• 1month - 1 Bulan\n\n"
+                "*Contoh:*\n"
+                "/addpremium 123456789 1month",
+                parse_mode='Markdown'
+            )
+            return
+        
+        try:
+            target_user_id = int(context.args[0])
+            duration = context.args[1]
+            
+            if duration not in ['1week', '1month']:
+                await update.message.reply_text("❌ Durasi tidak valid! Gunakan: 1week atau 1month")
+                return
+            
+            if self.user_manager:
+                self.user_manager.create_user(telegram_id=target_user_id)
+                
+                success = self.user_manager.upgrade_subscription(target_user_id, duration)
+                
+                if success:
+                    status = self.user_manager.get_subscription_status(target_user_id)
+                    
+                    duration_text = "1 Minggu" if duration == '1week' else "1 Bulan"
+                    
+                    msg = (
+                        f"✅ Berhasil menambahkan premium!\n\n"
+                        f"User ID: {target_user_id}\n"
+                        f"Durasi: {duration_text}\n"
+                        f"Berakhir: {status['expires']}\n"
+                    )
+                    await update.message.reply_text(msg)
+                    logger.info(f"Admin {update.effective_user.id} added premium to {target_user_id} for {duration}")
+                else:
+                    await update.message.reply_text("❌ Gagal menambahkan premium.")
+            else:
+                await update.message.reply_text("❌ User manager tidak tersedia.")
+                
+        except ValueError:
+            await update.message.reply_text("❌ User ID harus berupa angka!")
+        except Exception as e:
+            logger.error(f"Error adding premium: {e}")
+            await update.message.reply_text(f"❌ Error: {str(e)}")
+    
     async def run(self):
         if not self.config.TELEGRAM_BOT_TOKEN:
             logger.error("Telegram bot token not configured!")
@@ -432,12 +587,15 @@ class TradingBot:
         
         self.app.add_handler(CommandHandler("start", self.start_command))
         self.app.add_handler(CommandHandler("help", self.help_command))
+        self.app.add_handler(CommandHandler("langganan", self.langganan_command))
         self.app.add_handler(CommandHandler("monitor", self.monitor_command))
         self.app.add_handler(CommandHandler("stopmonitor", self.stopmonitor_command))
         self.app.add_handler(CommandHandler("getsignal", self.getsignal_command))
         self.app.add_handler(CommandHandler("riwayat", self.riwayat_command))
         self.app.add_handler(CommandHandler("performa", self.performa_command))
         self.app.add_handler(CommandHandler("settings", self.settings_command))
+        self.app.add_handler(CommandHandler("riset", self.riset_command))
+        self.app.add_handler(CommandHandler("addpremium", self.addpremium_command))
         
         logger.info("Telegram bot starting...")
         await self.app.initialize()

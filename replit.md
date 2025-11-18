@@ -1,15 +1,60 @@
-# XAUUSD Trading Bot - Full Featured Telegram Bot
+# XAUUSD Trading Bot Pro V2 - Full Featured Telegram Bot
 
 ## Gambaran Proyek
-Bot trading XAUUSD otomatis dengan fitur lengkap:
-- ✅ Sinyal trading real-time dengan foto chart
+Bot trading XAUUSD otomatis dengan fitur lengkap versi 2:
+- ✅ Sinyal trading real-time dengan foto chart + indikator teknikal
 - ✅ Tracking posisi otomatis sampai TP/SL tercapai
 - ✅ Notifikasi WIN/LOSE via Telegram
 - ✅ Unlimited signals (24/7)
 - ✅ Database untuk tracking performa
 - ✅ Risk management otomatis
+- ✅ **[V2]** Sistem langganan premium dengan paket mingguan & bulanan
+- ✅ **[V2]** Chart dengan indikator EMA, RSI, dan Stochastic (tidak polos)
+- ✅ **[V2]** Admin commands untuk manajemen user premium
+- ✅ **[V2]** Kontrol akses berbasis langganan
 
 ## Perubahan Terbaru (18 November 2025 - Latest)
+
+### 🎉 VERSION 2.0 - Sistem Premium & Chart Indikator (18 Nov 2025 - Latest)
+
+**Fitur Baru V2:**
+
+1. **Sistem Langganan Premium:**
+   - Paket 1 Minggu: Rp 15.000
+   - Paket 1 Bulan: Rp 30.000
+   - Auto-expire setelah periode berakhir
+   - Admin memiliki akses unlimited
+   
+2. **Command Baru:**
+   - `/langganan` - Cek status langganan (tier, expire date, sisa hari)
+   - `/riset` - [ADMIN] Reset database trading
+   - `/addpremium <user_id> <durasi>` - [ADMIN] Tambah premium user
+   
+3. **Chart dengan Indikator Lengkap:**
+   - EMA (5, 10, 20) ditampilkan pada chart utama
+   - RSI (14) dengan level overbought/oversold
+   - Stochastic (K/D) dengan level 20/80
+   - Chart 4 panel: Candlestick + Volume + RSI + Stochastic
+   - Lebih profesional dan informatif
+   
+4. **Kontrol Akses:**
+   - User non-premium mendapat pesan "⛔ Anda tidak memiliki akses ke bot ini"
+   - Sistem verifikasi langganan otomatis
+   - Admin bypass semua pembatasan
+   
+5. **Pesan /start yang Diperbaharui:**
+   - Menampilkan status user (Admin/Premium)
+   - Daftar command lengkap
+   - Info paket premium
+   - Mode operasi (LIVE/DRY RUN)
+
+**Cara Menambahkan User Premium:**
+```
+/addpremium 123456789 1week   # 1 minggu
+/addpremium 123456789 1month  # 1 bulan
+```
+
+## Perubahan Sebelumnya
 
 ### ✅ BUG FIXES - Bot Sekarang SIAP PAKAI! (18 Nov 2025 - 01:03 WIB)
 
@@ -55,11 +100,11 @@ Bot trading XAUUSD otomatis dengan fitur lengkap:
 - `strategy.py`: Deteksi sinyal (EMA, RSI, Stochastic, ATR)
 - `position_tracker.py`: Monitor posisi real-time sampai TP/SL
 - `telegram_bot.py`: Handler Telegram commands dan notifikasi
-- `chart_generator.py`: Generate chart dengan mplfinance
+- `chart_generator.py`: **[V2]** Generate chart dengan indikator EMA, RSI, Stochastic
 - `risk_manager.py`: Calculate lot size, P/L, risk limits
 - `alert_system.py`: Kirim notifikasi ke Telegram
 - `database.py`: SQLite untuk tracking trades
-- `user_manager.py`: Manage user data dan statistik
+- `user_manager.py`: **[V2]** Manage user, subscription, dan premium access
 
 **Strategi Trading:**
 - **EMA**: 5, 10, 20 (trend detection)
@@ -125,13 +170,20 @@ Bot trading XAUUSD otomatis dengan fitur lengkap:
 
 Setelah bot running, gunakan commands ini di Telegram:
 
+**User Commands:**
 - `/start` - Welcome message dan daftar commands
 - `/help` - Bantuan lengkap tentang cara kerja bot
+- `/langganan` - **[V2]** Cek status langganan premium
 - `/monitor` - Mulai monitoring sinyal trading
 - `/stopmonitor` - Stop monitoring
+- `/getsignal` - Dapatkan sinyal manual sekarang
 - `/riwayat` - Lihat 10 trade terakhir
 - `/performa` - Statistik win rate dan P/L
 - `/settings` - Lihat konfigurasi bot
+
+**Admin Commands:**
+- `/riset` - **[V2]** Reset database trading
+- `/addpremium <user_id> <durasi>` - **[V2]** Tambah premium user (durasi: 1week atau 1month)
 
 ## File Structure
 
@@ -186,13 +238,16 @@ matplotlib==3.8.2         # Plotting library
 
 ## Preferensi User
 
-- Bahasa komunikasi: **Bahasa Indonesia**
+- Bahasa komunikasi: **Bahasa Indonesia** (100% tidak ada bahasa Inggris)
 - Data source: **Deriv WebSocket** (gratis, tanpa API key)
 - Trading pair: **XAUUSD** (Gold)
-- Notifikasi: **Telegram** dengan foto chart
+- Notifikasi: **Telegram** dengan foto chart + indikator
 - Tracking: **Real-time** sampai TP/SL
-- Mode: **24/7 unlimited**
+- Mode: **24/7 unlimited** untuk admin/premium
 - Akurasi: Strategi multi-indicator dengan validasi ketat
+- **[V2]** Chart: Menampilkan indikator EMA, RSI, Stochastic (tidak polos)
+- **[V2]** Sistem Premium: Paket mingguan (Rp 15.000) dan bulanan (Rp 30.000)
+- **[V2]** Kontak untuk langganan: @dzeckyete
 
 ## Deployment
 
@@ -208,11 +263,34 @@ None - Bot berjalan dengan baik dan stabil.
 
 ## Next Steps
 
+**Untuk Admin:**
 1. Dapatkan Telegram User ID dari @userinfobot
-2. Set AUTHORIZED_USER_IDS di Replit Secrets
+2. Set AUTHORIZED_USER_IDS di Replit Secrets (admin ID)
 3. Restart bot (otomatis setelah set secret)
 4. Buka bot Telegram Anda
-5. Ketik `/start` untuk mulai
+5. Ketik `/start` untuk mulai (akan muncul sebagai Admin dengan unlimited access)
 6. Ketik `/monitor` untuk mulai menerima sinyal
-7. Bot akan kirim sinyal dengan chart secara otomatis
+7. Bot akan kirim sinyal dengan chart + indikator secara otomatis
 8. Bot akan track posisi dan kirim hasil WIN/LOSE
+
+**Untuk Menambahkan User Premium:**
+1. Minta user mengirim `/start` ke bot untuk registrasi
+2. Dapatkan User ID mereka (akan muncul di logs atau minta dari @userinfobot)
+3. Ketik `/addpremium <user_id> 1week` atau `/addpremium <user_id> 1month`
+4. User akan mendapat akses sesuai durasi yang dipilih
+5. User dapat cek status dengan `/langganan`
+
+## Paket Premium
+
+💎 **Harga:**
+- 1 Minggu: Rp 15.000
+- 1 Bulan: Rp 30.000
+
+📱 **Kontak:** @dzeckyete
+
+✨ **Benefit Premium:**
+- Akses penuh ke semua fitur bot
+- Sinyal trading real-time dengan chart profesional
+- Tracking posisi otomatis
+- Notifikasi WIN/LOSE
+- Statistik performa lengkap

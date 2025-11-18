@@ -3,6 +3,7 @@ import pandas as pd
 import mplfinance as mpf
 from datetime import datetime
 from typing import Optional
+import json
 from bot.logger import setup_logger
 
 logger = setup_logger('ChartGenerator')
@@ -33,7 +34,44 @@ class ChartGenerator:
                 return None
             
             addplot = []
-            markers = []
+            
+            from bot.indicators import IndicatorEngine
+            indicator_engine = IndicatorEngine(self.config)
+            
+            ema_5 = df_copy['close'].ewm(span=self.config.EMA_PERIODS[0], adjust=False).mean()
+            ema_10 = df_copy['close'].ewm(span=self.config.EMA_PERIODS[1], adjust=False).mean()
+            ema_20 = df_copy['close'].ewm(span=self.config.EMA_PERIODS[2], adjust=False).mean()
+            
+            addplot.append(mpf.make_addplot(ema_5, color='blue', width=1.5, panel=0, label=f'EMA {self.config.EMA_PERIODS[0]}'))
+            addplot.append(mpf.make_addplot(ema_10, color='orange', width=1.5, panel=0, label=f'EMA {self.config.EMA_PERIODS[1]}'))
+            addplot.append(mpf.make_addplot(ema_20, color='red', width=1.5, panel=0, label=f'EMA {self.config.EMA_PERIODS[2]}'))
+            
+            delta = df_copy['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=self.config.RSI_PERIOD).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=self.config.RSI_PERIOD).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            
+            addplot.append(mpf.make_addplot(rsi, color='purple', width=1.5, panel=1, ylabel='RSI', ylim=(0, 100)))
+            
+            rsi_70 = pd.Series([70] * len(df_copy), index=df_copy.index)
+            rsi_30 = pd.Series([30] * len(df_copy), index=df_copy.index)
+            addplot.append(mpf.make_addplot(rsi_70, color='red', width=0.8, panel=1, linestyle='--', alpha=0.5))
+            addplot.append(mpf.make_addplot(rsi_30, color='green', width=0.8, panel=1, linestyle='--', alpha=0.5))
+            
+            low_min = df_copy['low'].rolling(window=self.config.STOCH_K_PERIOD).min()
+            high_max = df_copy['high'].rolling(window=self.config.STOCH_K_PERIOD).max()
+            stoch_k = 100 * (df_copy['close'] - low_min) / (high_max - low_min)
+            stoch_k = stoch_k.rolling(window=self.config.STOCH_SMOOTH_K).mean()
+            stoch_d = stoch_k.rolling(window=self.config.STOCH_D_PERIOD).mean()
+            
+            addplot.append(mpf.make_addplot(stoch_k, color='blue', width=1.5, panel=2, ylabel='Stochastic', ylim=(0, 100)))
+            addplot.append(mpf.make_addplot(stoch_d, color='orange', width=1.5, panel=2))
+            
+            stoch_80 = pd.Series([80] * len(df_copy), index=df_copy.index)
+            stoch_20 = pd.Series([20] * len(df_copy), index=df_copy.index)
+            addplot.append(mpf.make_addplot(stoch_80, color='red', width=0.8, panel=2, linestyle='--', alpha=0.5))
+            addplot.append(mpf.make_addplot(stoch_20, color='green', width=0.8, panel=2, linestyle='--', alpha=0.5))
             
             if signal:
                 entry_price = signal.get('entry_price')
@@ -42,7 +80,7 @@ class ChartGenerator:
                 signal_type = signal.get('signal')
                 
                 if entry_price and signal_type:
-                    marker_color = 'g' if signal_type == 'BUY' else 'r'
+                    marker_color = 'lime' if signal_type == 'BUY' else 'red'
                     marker_symbol = '^' if signal_type == 'BUY' else 'v'
                     
                     marker_series = pd.Series(index=df_copy.index, data=[None] * len(df_copy))
@@ -50,7 +88,7 @@ class ChartGenerator:
                     
                     addplot.append(
                         mpf.make_addplot(marker_series, type='scatter', 
-                                        markersize=100, marker=marker_symbol, 
+                                        markersize=150, marker=marker_symbol, 
                                         color=marker_color, panel=0)
                     )
                 
@@ -58,22 +96,22 @@ class ChartGenerator:
                     sl_line = pd.Series(index=df_copy.index, data=[stop_loss] * len(df_copy))
                     addplot.append(
                         mpf.make_addplot(sl_line, type='line', 
-                                        color='red', linestyle='--', 
-                                        width=2, panel=0, 
-                                        alpha=0.7, label='Stop Loss')
+                                        color='darkred', linestyle='--', 
+                                        width=2.5, panel=0, 
+                                        alpha=0.8)
                     )
                 
                 if take_profit:
                     tp_line = pd.Series(index=df_copy.index, data=[take_profit] * len(df_copy))
                     addplot.append(
                         mpf.make_addplot(tp_line, type='line', 
-                                        color='green', linestyle='--', 
-                                        width=2, panel=0, 
-                                        alpha=0.7, label='Take Profit')
+                                        color='darkgreen', linestyle='--', 
+                                        width=2.5, panel=0, 
+                                        alpha=0.8)
                     )
             
             mc = mpf.make_marketcolors(
-                up='g', down='r',
+                up='lime', down='red',
                 edge='inherit',
                 wick='inherit',
                 volume='in'
@@ -81,29 +119,33 @@ class ChartGenerator:
             
             style = mpf.make_mpf_style(
                 marketcolors=mc,
-                gridstyle='--',
-                y_on_right=True
+                gridstyle=':',
+                gridcolor='gray',
+                gridaxis='both',
+                y_on_right=False,
+                rc={'font.size': 10}
             )
             
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f'xauusd_{timeframe}_{timestamp}.png'
             filepath = os.path.join(self.chart_dir, filename)
             
-            title = f'XAUUSD {timeframe}'
+            title = f'XAUUSD {timeframe} - Analisis Teknikal'
             if signal:
-                title += f" - {signal.get('signal', 'SIGNAL')} Signal"
+                title += f" ({signal.get('signal', 'SIGNAL')} Signal)"
             
             fig, axes = mpf.plot(
                 df_copy,
                 type='candle',
                 style=style,
                 title=title,
-                ylabel='Price',
+                ylabel='Price (USD)',
                 volume=True,
                 addplot=addplot if addplot else None,
                 savefig=filepath,
-                figsize=(12, 8),
-                returnfig=True
+                figsize=(14, 12),
+                returnfig=True,
+                panel_ratios=(3, 1, 1, 1)
             )
             
             logger.info(f"Chart generated: {filepath}")
