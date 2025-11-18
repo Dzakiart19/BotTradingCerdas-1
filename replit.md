@@ -46,7 +46,7 @@ The bot's architecture is modular, designed for scalability and maintainability.
     -   **Manual Mode (Relaxed):** Allows for more opportunities with flexible conditions (EMA trend OR crossover, RSI crossover zone OR bullish/bearish, optional Stochastic/Volume) (OR logic).
     -   **Fallback Logic:** Manual mode gracefully handles missing historical data (rsi_prev, stoch_prev) by using current values only.
 -   **Indicators:** EMA (5, 10, 20), RSI (14), Stochastic (K=14, D=3), ATR (14), Volume (0.5x average confirmation).
--   **Risk Management:** Dynamic SL (1.0x ATR, min 20 pips), dynamic TP (1.5x R:R, min 30 pips), max spread (5 pips), signal cooldown (120s), daily loss limit (3%), risk per trade (0.5%).
+-   **Risk Management:** Fixed SL ($1 per trade), dynamic TP (1.0x-2.5x R:R based on trend strength), max spread (5 pips), signal cooldown (120s), daily loss limit (3%), risk per trade (0.5%).
 -   **Subscription System:**
     -   Weekly (Rp 15,000) and Monthly (Rp 30,000) premium packages.
     -   Automatic expiry.
@@ -63,10 +63,41 @@ The bot's architecture is modular, designed for scalability and maintainability.
 -   **Database:** SQLite for lightweight, embedded data storage with auto-migration support.
 -   **Deployment:** Designed for Koyeb and Replit, with Dockerfile using Debian Trixie compatible libraries (`libgl1` instead of `libgl1-mesa-glx`).
 
-## Recent Changes (V2.3)
+## Recent Changes (V2.4 - Dynamic Profit System)
 **Date:** November 18, 2025
 
-**Enhancements:**
+**Major Enhancement: Dynamic Take Profit Based on Trend Strength**
+1. **Intelligent Trend Strength Analysis:**
+   - Added `calculate_trend_strength()` function that scores market conditions from 0.0 (weak) to 1.0 (very strong)
+   - Analyzes 4 key factors with equal weighting (25% each):
+     - **EMA Separation:** Distance between short and long EMA relative to price
+     - **MACD Histogram:** Strength of momentum indicator
+     - **RSI Momentum:** Distance from neutral zone (50)
+     - **Volume Ratio:** Current volume vs average volume
+   - Returns descriptive labels: WEAK ⚠️, MEDIUM ⚡, STRONG 💪, VERY STRONG 🔥
+
+2. **Dynamic Take Profit Ratio:**
+   - **Formula:** `TP Ratio = 1.0 + (trend_strength × 1.5)`, capped at 2.5x maximum
+   - **Fixed Stop Loss:** Always $1 per trade for consistent risk management
+   - **Variable Profit Target:**
+     - Weak trend (0.0-0.3): R:R 1:1.0-1.45 → Profit $1.00-$1.45
+     - Medium trend (0.3-0.5): R:R 1:1.45-1.75 → Profit $1.45-$1.75
+     - Strong trend (0.5-0.75): R:R 1:1.75-2.125 → Profit $1.75-$2.12
+     - Very Strong trend (0.75-1.0): R:R 1:2.125-2.5 → Profit $2.12-$2.50
+
+3. **Enhanced Signal Messages:**
+   - Now displays trend strength with emoji indicators
+   - Shows expected profit and loss in dollars
+   - Displays calculated R:R ratio for transparency
+   - Educational value: helps users understand why each signal has different profit targets
+
+4. **Critical Infrastructure Fixes:**
+   - Added explicit `is not None` checks for all indicator comparisons (prevents TypeError)
+   - Added zero-division guards (`close > 0`, `volume_avg > 0`)
+   - Robust None handling throughout trend strength calculation
+   - Production-ready error handling for missing or incomplete indicator data
+
+**V2.3 Changes:**
 1. **Fixed Koyeb Deployment Error:** Replaced `libgl1-mesa-glx` with `libgl1` for Debian Trixie compatibility.
 2. **Dual-Mode Signal Strategy:** Separated automatic (strict) and manual (relaxed) signal generation to prevent spam/conflicts.
 3. **Enhanced Scalping Strategy:** Implemented RSI crossover detection, EMA trend/crossover analysis, Stochastic confirmation, and volume filtering based on proven GitHub strategies (GioxTom RSI Scalping, Alpaca Bot, M1 Countertrend).
