@@ -124,7 +124,7 @@ class TradingBot:
             f"- Max trades per day: Unlimited (24/7)\n"
             f"- Daily loss limit: {self.config.DAILY_LOSS_PERCENT}%\n"
             f"- Signal cooldown: {self.config.SIGNAL_COOLDOWN_SECONDS}s\n"
-            f"- Risk per trade: {self.config.RISK_PER_TRADE_PERCENT}%\n"
+            f"- Risk per trade: ${self.config.FIXED_RISK_AMOUNT:.2f} (Fixed)\n"
         )
         
         await update.message.reply_text(help_msg, parse_mode='Markdown')

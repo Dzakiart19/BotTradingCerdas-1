@@ -57,7 +57,7 @@ class RiskManager:
     
     def calculate_position_size(self, account_balance: float, entry_price: float, 
                                stop_loss: float, signal_type: str) -> float:
-        risk_amount = account_balance * (self.config.RISK_PER_TRADE_PERCENT / 100)
+        risk_amount = self.config.FIXED_RISK_AMOUNT
         
         pips_at_risk = abs(entry_price - stop_loss) * self.config.XAUUSD_PIP_VALUE
         
@@ -68,7 +68,7 @@ class RiskManager:
         
         lot_size = max(0.01, min(lot_size, 1.0))
         
-        logger.info(f"Calculated position size: {lot_size} lots (Risk: ${risk_amount:.2f})")
+        logger.info(f"Calculated position size: {lot_size} lots (Fixed Risk: ${risk_amount:.2f})")
         return lot_size
     
     def calculate_pl(self, entry_price: float, exit_price: float, 

@@ -32,6 +32,7 @@ class Config:
     MAX_TRADES_PER_DAY = int(os.getenv('MAX_TRADES_PER_DAY', '999999'))
     DAILY_LOSS_PERCENT = float(os.getenv('DAILY_LOSS_PERCENT', '3.0'))
     RISK_PER_TRADE_PERCENT = float(os.getenv('RISK_PER_TRADE_PERCENT', '0.5'))
+    FIXED_RISK_AMOUNT = float(os.getenv('FIXED_RISK_AMOUNT', '1.0'))
     
     DYNAMIC_SL_LOSS_THRESHOLD = float(os.getenv('DYNAMIC_SL_LOSS_THRESHOLD', '1.0'))
     DYNAMIC_SL_TIGHTENING_MULTIPLIER = float(os.getenv('DYNAMIC_SL_TIGHTENING_MULTIPLIER', '0.5'))
