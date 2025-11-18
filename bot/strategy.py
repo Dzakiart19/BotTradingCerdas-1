@@ -34,53 +34,39 @@ class TradingStrategy:
                 logger.warning("Missing required indicators")
                 return None
             
-            ema_aligned_bullish = (ema_short is not None and ema_mid is not None and 
-                                  ema_long is not None and ema_short > ema_mid > ema_long)
-            ema_aligned_bearish = (ema_short is not None and ema_mid is not None and 
-                                  ema_long is not None and ema_short < ema_mid < ema_long)
+            ema_aligned_bullish = (ema_short is not None and ema_long is not None and ema_short > ema_long)
+            ema_aligned_bearish = (ema_short is not None and ema_long is not None and ema_short < ema_long)
             
-            rsi_bullish_cross = (rsi_prev is not None and rsi is not None and
-                                rsi_prev <= self.config.RSI_OVERSOLD_LEVEL and 
-                                rsi > self.config.RSI_OVERSOLD_LEVEL)
-            rsi_bearish_cross = (rsi_prev is not None and rsi is not None and
-                                rsi_prev >= self.config.RSI_OVERBOUGHT_LEVEL and 
-                                rsi < self.config.RSI_OVERBOUGHT_LEVEL)
+            rsi_bullish_signal = (rsi is not None and rsi < 50)
+            rsi_bearish_signal = (rsi is not None and rsi > 50)
             
-            stoch_bullish_cross = (stoch_k_prev is not None and stoch_d_prev is not None and
-                                  stoch_k is not None and stoch_d is not None and
-                                  stoch_k_prev < stoch_d_prev and 
-                                  stoch_k > stoch_d and 
-                                  stoch_k < self.config.STOCH_OVERSOLD_LEVEL)
-            stoch_bearish_cross = (stoch_k_prev is not None and stoch_d_prev is not None and
-                                  stoch_k is not None and stoch_d is not None and
-                                  stoch_k_prev > stoch_d_prev and 
-                                  stoch_k < stoch_d and 
-                                  stoch_k > self.config.STOCH_OVERBOUGHT_LEVEL)
+            stoch_bullish_signal = (stoch_k is not None and stoch_d is not None and stoch_k > stoch_d)
+            stoch_bearish_signal = (stoch_k is not None and stoch_d is not None and stoch_k < stoch_d)
             
             high_volume = volume > (volume_avg * self.config.VOLUME_THRESHOLD_MULTIPLIER)
             
             signal = None
             confidence_reasons = []
             
-            if ema_aligned_bullish and (rsi_bullish_cross or stoch_bullish_cross):
+            if ema_aligned_bullish and (rsi_bullish_signal or stoch_bullish_signal):
                 signal = 'BUY'
-                confidence_reasons.append("EMA alignment bullish")
-                if rsi_bullish_cross:
-                    confidence_reasons.append("RSI oversold crossover")
-                if stoch_bullish_cross:
-                    confidence_reasons.append("Stochastic bullish cross")
+                confidence_reasons.append("EMA trend bullish")
+                if rsi_bullish_signal:
+                    confidence_reasons.append("RSI bullish zone")
+                if stoch_bullish_signal:
+                    confidence_reasons.append("Stochastic bullish")
                 if high_volume:
-                    confidence_reasons.append("High volume confirmation")
+                    confidence_reasons.append("High volume")
                     
-            elif ema_aligned_bearish and (rsi_bearish_cross or stoch_bearish_cross):
+            elif ema_aligned_bearish and (rsi_bearish_signal or stoch_bearish_signal):
                 signal = 'SELL'
-                confidence_reasons.append("EMA alignment bearish")
-                if rsi_bearish_cross:
-                    confidence_reasons.append("RSI overbought crossover")
-                if stoch_bearish_cross:
-                    confidence_reasons.append("Stochastic bearish cross")
+                confidence_reasons.append("EMA trend bearish")
+                if rsi_bearish_signal:
+                    confidence_reasons.append("RSI bearish zone")
+                if stoch_bearish_signal:
+                    confidence_reasons.append("Stochastic bearish")
                 if high_volume:
-                    confidence_reasons.append("High volume confirmation")
+                    confidence_reasons.append("High volume")
             
             if signal:
                 sl_distance = atr * self.config.SL_ATR_MULTIPLIER
