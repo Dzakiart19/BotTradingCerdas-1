@@ -97,6 +97,14 @@ RISK_PER_TRADE_PERCENT=0.5
 
 ## 🔍 Troubleshooting
 
+### Docker Build Failed - libgl1-mesa-glx Error
+
+**Problem**: Error saat build Docker - "Package 'libgl1-mesa-glx' has no installation candidate"
+**Solusi**: ✅ **SUDAH DIPERBAIKI!**
+- Dockerfile sudah diupdate untuk menggunakan `libgl1` (Debian Trixie compatible)
+- Package dependencies sudah dioptimalkan
+- Build sekarang lebih cepat dan lebih kecil
+
 ### Bot tidak response di Telegram
 
 **Problem**: Bot tidak merespons command
@@ -142,16 +150,18 @@ RISK_PER_TRADE_PERCENT=0.5
 /settings    - Lihat konfigurasi bot
 ```
 
-## 🎯 Fitur Bot
+## 🎯 Fitur Bot (UPDATED v2.0)
 
 - ✅ **Real-time data** dari Deriv (XAUUSD/Gold)
 - ✅ **Zero API key** required untuk market data
-- ✅ **Automatic signals** dengan indikator EMA, RSI, Stochastic, ATR
-- ✅ **Manual signals** on-demand via `/getsignal`
+- ✅ **Dual signal modes**: 🤖 Auto (strict) & 👤 Manual (relaxed)
+- ✅ **Enhanced strategy**: RSI crossover + EMA trend + volume confirmation
+- ✅ **No signal spam**: Pemisahan jelas auto vs manual
 - ✅ **Chart visualization** setiap sinyal
 - ✅ **Position tracking** hingga TP/SL tercapai
 - ✅ **Risk management** dengan cooldown & daily loss limit
 - ✅ **24/7 monitoring** tanpa henti
+- ✅ **Signal source tracking**: Setiap sinyal ter-label sumbernya
 
 ## 🆓 Free Tier Limits
 

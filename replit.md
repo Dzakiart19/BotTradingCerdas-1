@@ -17,7 +17,66 @@ Bot trading XAUUSD otomatis dengan fitur lengkap versi 2:
 
 ## Perubahan Terbaru (18 November 2025 - Latest)
 
-### 🎉 VERSION 2.2 - Chart Generation Fix & Anti-Duplicate (18 Nov 2025 - Latest)
+### 🎉 VERSION 2.3 - Enhanced Strategy & Signal Separation (18 Nov 2025 - LATEST)
+
+**Major Improvements:**
+
+1. **Pemisahan Sinyal Auto vs Manual:**
+   - Sinyal otomatis (🤖): Strict mode dengan semua kondisi harus terpenuhi
+   - Sinyal manual (👤): Relaxed mode dengan kondisi lebih fleksibel
+   - Setiap sinyal diberi label source-nya (OTOMATIS atau MANUAL)
+   - Database tracking signal_source untuk analisis performa terpisah
+   - No more signal spam - logic jelas untuk setiap mode
+
+2. **Strategi Scalping yang Ditingkatkan:**
+   - RSI crossover detection (keluar dari oversold/overbought zone)
+   - EMA trend + crossover detection (catch fresh momentum)
+   - Stochastic crossover confirmation
+   - Volume confirmation untuk strengthen signal
+   - Multi-condition logic: Auto (AND) vs Manual (OR)
+
+3. **Docker Deployment Fixed:**
+   - Fixed `libgl1-mesa-glx` error untuk Debian Trixie
+   - Updated Dockerfile dengan `libgl1` (modern alternative)
+   - Optimized package dependencies
+   - Build lebih cepat dan image lebih kecil
+
+4. **Database Schema Updated:**
+   - Added `signal_source` field di Trade table
+   - Added `signal_source` field di SignalLog table
+   - Support tracking performa auto vs manual signals
+   - Migration otomatis saat bot restart
+
+5. **Enhanced Signal Messages:**
+   - Icon 🤖 untuk sinyal otomatis
+   - Icon 👤 untuk sinyal manual
+   - Tampilkan source (OTOMATIS/MANUAL) di setiap sinyal
+   - Tampilkan confidence reasons (alasan kenapa sinyal muncul)
+   - Lebih informatif dan educational
+
+**Strategy Logic Changes:**
+
+**Auto Mode (Strict - High Precision):**
+- EMA trend bullish/bearish (5 > 10 > 20 atau sebaliknya)
+- EMA crossover fresh (baru terjadi)
+- RSI > 50 (bullish) atau < 50 (bearish)
+- Stochastic crossover konfirmasi
+- Volume tinggi wajib
+
+**Manual Mode (Relaxed - More Opportunities):**
+- EMA trend ATAU crossover (salah satu saja cukup)
+- RSI crossover zone ATAU bullish/bearish
+- Stochastic opsional (bonus confidence)
+- Volume opsional
+
+**Benefits:**
+- ✅ No signal spam antara auto dan manual
+- ✅ Strategi lebih robust dan proven
+- ✅ Deployment di Koyeb 100% working
+- ✅ Better tracking dan analytics
+- ✅ User bisa pilih mode sesuai kebutuhan
+
+### 🎉 VERSION 2.2 - Chart Generation Fix & Anti-Duplicate (18 Nov 2025)
 
 **Bug Fixes & Improvements:**
 
@@ -179,12 +238,13 @@ Bot trading XAUUSD otomatis dengan fitur lengkap versi 2:
 - `database.py`: SQLite untuk tracking trades
 - `user_manager.py`: **[V2]** Manage user, subscription, dan premium access
 
-**Strategi Trading:**
-- **EMA**: 5, 10, 20 (trend detection)
-- **RSI**: 14 period (oversold 30, overbought 70)
-- **Stochastic**: K=14, D=3 (momentum confirmation)
+**Strategi Trading (V2.3 Enhanced):**
+- **EMA**: 5, 10, 20 (trend detection + crossover)
+- **RSI**: 14 period (crossover zone detection 30/70)
+- **Stochastic**: K=14, D=3 (crossover confirmation 20/80)
 - **ATR**: 14 period (untuk set SL/TP dinamis)
-- **Volume**: Konfirmasi volume 1.5x average
+- **Volume**: Konfirmasi volume 0.5x average
+- **Dual Mode**: Auto (strict AND) vs Manual (relaxed OR)
 
 **Risk Management:**
 - SL: 1.0x ATR (default 20 pips minimum)

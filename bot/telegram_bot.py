@@ -214,7 +214,7 @@ class TradingBot:
                                 logger.info("⏳ Posisi aktif sedang berjalan - menunggu TP/SL tercapai...")
                                 continue
                             
-                            signal = self.strategy.detect_signal(indicators, 'M1')
+                            signal = self.strategy.detect_signal(indicators, 'M1', signal_source='auto')
                             
                             if signal:
                                 logger.info(f"🚨 Signal detected: {signal['signal']}")
@@ -260,9 +260,12 @@ class TradingBot:
         try:
             session = self.db.get_session()
             
+            signal_source = signal.get('signal_source', 'auto')
+            
             trade = Trade(
                 ticker='XAUUSD',
                 signal_type=signal['signal'],
+                signal_source=signal_source,
                 entry_price=signal['entry_price'],
                 stop_loss=signal['stop_loss'],
                 take_profit=signal['take_profit'],
@@ -277,14 +280,23 @@ class TradingBot:
             sl_pips = abs(signal['entry_price'] - signal['stop_loss']) * self.config.XAUUSD_PIP_VALUE
             tp_pips = abs(signal['entry_price'] - signal['take_profit']) * self.config.XAUUSD_PIP_VALUE
             
+            source_icon = "🤖" if signal_source == 'auto' else "👤"
+            source_text = "OTOMATIS" if signal_source == 'auto' else "MANUAL"
+            
             msg = (
-                f"🚨 *SINYAL {signal['signal']}*\n\n"
+                f"🚨 *SINYAL {signal['signal']}* {source_icon}\n\n"
+                f"*Source:* {source_text}\n"
                 f"*Ticker:* XAUUSD\n"
                 f"*Timeframe:* {signal['timeframe']}\n"
                 f"*Entry:* ${signal['entry_price']:.2f}\n"
                 f"*Stop Loss:* ${signal['stop_loss']:.2f} ({sl_pips:.1f} pips)\n"
                 f"*Take Profit:* ${signal['take_profit']:.2f} ({tp_pips:.1f} pips)\n"
             )
+            
+            if 'confidence_reasons' in signal and signal['confidence_reasons']:
+                msg += f"\n*Alasan:*\n"
+                for reason in signal['confidence_reasons']:
+                    msg += f"• {reason}\n"
             
             if self.app and self.app.bot:
                 await self.app.bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown')
@@ -444,7 +456,7 @@ class TradingBot:
                 await update.message.reply_text("❌ Gagal menghitung indikator. Coba lagi.")
                 return
             
-            signal = self.strategy.detect_signal(indicators, 'M1')
+            signal = self.strategy.detect_signal(indicators, 'M1', signal_source='manual')
             
             if not signal:
                 await update.message.reply_text(

@@ -8,13 +8,3 @@ aiohttp==3.9.1
 python-dotenv==1.0.0
 mplfinance==0.12.10b0
 matplotlib==3.8.2
-aiohttp
-matplotlib
-mplfinance
-numpy
-pandas
-python-dotenv
-python-telegram-bot
-pytz
-SQLAlchemy
-websockets

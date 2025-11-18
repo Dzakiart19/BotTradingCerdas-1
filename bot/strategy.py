@@ -8,7 +8,7 @@ class TradingStrategy:
     def __init__(self, config):
         self.config = config
         
-    def detect_signal(self, indicators: Dict, timeframe: str = 'M1') -> Optional[Dict]:
+    def detect_signal(self, indicators: Dict, timeframe: str = 'M1', signal_source: str = 'auto') -> Optional[Dict]:
         if not indicators:
             return None
         
@@ -34,29 +34,84 @@ class TradingStrategy:
                 logger.warning("Missing required indicators")
                 return None
             
-            ema_aligned_bullish = (ema_short is not None and ema_long is not None and ema_short > ema_long)
-            ema_aligned_bearish = (ema_short is not None and ema_long is not None and ema_short < ema_long)
-            
-            rsi_bullish_signal = True
-            rsi_bearish_signal = True
-            
-            stoch_bullish_signal = (stoch_k is not None and stoch_d is not None and stoch_k > stoch_d)
-            stoch_bearish_signal = (stoch_k is not None and stoch_d is not None and stoch_k < stoch_d)
-            
-            high_volume = True
-            
             signal = None
             confidence_reasons = []
             
-            if ema_aligned_bullish:
-                signal = 'BUY'
-                confidence_reasons.append("EMA trend bullish (TEST MODE)")
-                confidence_reasons.append("Quick test signal")
-                    
-            elif ema_aligned_bearish:
-                signal = 'SELL'
-                confidence_reasons.append("EMA trend bearish (TEST MODE)")
-                confidence_reasons.append("Quick test signal")
+            ema_trend_bullish = ema_short > ema_mid > ema_long
+            ema_trend_bearish = ema_short < ema_mid < ema_long
+            
+            ema_crossover_bullish = (ema_short is not None and ema_mid is not None and 
+                                     ema_short > ema_mid and 
+                                     abs(ema_short - ema_mid) / ema_mid < 0.001)
+            ema_crossover_bearish = (ema_short is not None and ema_mid is not None and 
+                                     ema_short < ema_mid and 
+                                     abs(ema_short - ema_mid) / ema_mid < 0.001)
+            
+            rsi_oversold_crossup = False
+            rsi_overbought_crossdown = False
+            if rsi_prev is not None:
+                rsi_oversold_crossup = (rsi_prev < self.config.RSI_OVERSOLD_LEVEL and rsi >= self.config.RSI_OVERSOLD_LEVEL)
+                rsi_overbought_crossdown = (rsi_prev > self.config.RSI_OVERBOUGHT_LEVEL and rsi <= self.config.RSI_OVERBOUGHT_LEVEL)
+            
+            rsi_bullish = rsi is not None and rsi > 50
+            rsi_bearish = rsi is not None and rsi < 50
+            
+            stoch_bullish = False
+            stoch_bearish = False
+            if stoch_k_prev is not None and stoch_d_prev is not None:
+                stoch_bullish = (stoch_k_prev < stoch_d_prev and stoch_k > stoch_d and 
+                                stoch_k < self.config.STOCH_OVERBOUGHT_LEVEL)
+                stoch_bearish = (stoch_k_prev > stoch_d_prev and stoch_k < stoch_d and 
+                                stoch_k > self.config.STOCH_OVERSOLD_LEVEL)
+            
+            volume_strong = True
+            if volume is not None and volume_avg is not None:
+                volume_strong = volume > volume_avg * self.config.VOLUME_THRESHOLD_MULTIPLIER
+            
+            if signal_source == 'auto':
+                if (ema_trend_bullish and ema_crossover_bullish and rsi_bullish and 
+                    stoch_bullish and volume_strong):
+                    signal = 'BUY'
+                    confidence_reasons.append("EMA trend bullish dengan crossover")
+                    confidence_reasons.append("RSI di atas 50 (momentum bullish)")
+                    confidence_reasons.append("Stochastic crossover bullish")
+                    if volume_strong:
+                        confidence_reasons.append("Volume tinggi konfirmasi")
+                        
+                elif (ema_trend_bearish and ema_crossover_bearish and rsi_bearish and 
+                      stoch_bearish and volume_strong):
+                    signal = 'SELL'
+                    confidence_reasons.append("EMA trend bearish dengan crossover")
+                    confidence_reasons.append("RSI di bawah 50 (momentum bearish)")
+                    confidence_reasons.append("Stochastic crossover bearish")
+                    if volume_strong:
+                        confidence_reasons.append("Volume tinggi konfirmasi")
+            else:
+                ema_condition_bullish = ema_trend_bullish or ema_crossover_bullish
+                ema_condition_bearish = ema_trend_bearish or ema_crossover_bearish
+                
+                rsi_condition_bullish = rsi_oversold_crossup or rsi_bullish
+                rsi_condition_bearish = rsi_overbought_crossdown or rsi_bearish
+                
+                if ema_condition_bullish and rsi_condition_bullish:
+                    signal = 'BUY'
+                    confidence_reasons.append("Manual: EMA bullish")
+                    if rsi_oversold_crossup:
+                        confidence_reasons.append("RSI keluar dari oversold")
+                    elif rsi_bullish:
+                        confidence_reasons.append("RSI bullish")
+                    if stoch_bullish:
+                        confidence_reasons.append("Stochastic konfirmasi bullish")
+                        
+                elif ema_condition_bearish and rsi_condition_bearish:
+                    signal = 'SELL'
+                    confidence_reasons.append("Manual: EMA bearish")
+                    if rsi_overbought_crossdown:
+                        confidence_reasons.append("RSI keluar dari overbought")
+                    elif rsi_bearish:
+                        confidence_reasons.append("RSI bearish")
+                    if stoch_bearish:
+                        confidence_reasons.append("Stochastic konfirmasi bearish")
             
             if signal:
                 sl_distance = atr * self.config.SL_ATR_MULTIPLIER
@@ -69,10 +124,11 @@ class TradingStrategy:
                     stop_loss = close + sl_distance
                     take_profit = close - tp_distance
                 
-                logger.info(f"{signal} signal detected on {timeframe}: {', '.join(confidence_reasons)}")
+                logger.info(f"{signal} signal detected ({signal_source}) on {timeframe}: {', '.join(confidence_reasons)}")
                 
                 return {
                     'signal': signal,
+                    'signal_source': signal_source,
                     'entry_price': float(close),
                     'stop_loss': float(stop_loss),
                     'take_profit': float(take_profit),
