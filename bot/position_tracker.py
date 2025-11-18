@@ -182,3 +182,9 @@ class PositionTracker:
     
     def get_active_positions(self) -> Dict:
         return self.active_positions.copy()
+    
+    def has_active_position(self) -> bool:
+        return len(self.active_positions) > 0
+    
+    def get_active_position_count(self) -> int:
+        return len(self.active_positions)

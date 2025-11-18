@@ -176,6 +176,11 @@ class TradingBot:
                         
                         if indicators:
                             logger.info("🔍 Indicators calculated, checking for signals...")
+                            
+                            if self.position_tracker.has_active_position():
+                                logger.info("⏳ Posisi aktif sedang berjalan - menunggu TP/SL tercapai...")
+                                continue
+                            
                             signal = self.strategy.detect_signal(indicators, 'M1')
                             
                             if signal:
@@ -531,23 +536,45 @@ class TradingBot:
             await update.message.reply_text(
                 "❌ Format salah!\n\n"
                 "*Penggunaan:*\n"
-                "/addpremium <user_id> <durasi>\n\n"
+                "/addpremium <user_id/@username> <durasi>\n\n"
                 "*Durasi:*\n"
                 "• 1week - 1 Minggu\n"
                 "• 1month - 1 Bulan\n\n"
                 "*Contoh:*\n"
-                "/addpremium 123456789 1month",
+                "/addpremium 123456789 1month\n"
+                "/addpremium @dzeckyete 1week",
                 parse_mode='Markdown'
             )
             return
         
         try:
-            target_user_id = int(context.args[0])
+            user_input = context.args[0]
             duration = context.args[1]
             
             if duration not in ['1week', '1month']:
                 await update.message.reply_text("❌ Durasi tidak valid! Gunakan: 1week atau 1month")
                 return
+            
+            target_user_id = None
+            
+            if user_input.startswith('@'):
+                username = user_input[1:]
+                
+                if self.user_manager:
+                    target_user_id = self.user_manager.get_user_by_username(username)
+                
+                if not target_user_id:
+                    await update.message.reply_text(
+                        f"❌ Username @{username} tidak ditemukan!\n\n"
+                        "User harus mengirim /start ke bot terlebih dahulu."
+                    )
+                    return
+            else:
+                try:
+                    target_user_id = int(user_input)
+                except ValueError:
+                    await update.message.reply_text("❌ Format salah! Gunakan user ID (angka) atau @username")
+                    return
             
             if self.user_manager:
                 self.user_manager.create_user(telegram_id=target_user_id)
@@ -562,18 +589,29 @@ class TradingBot:
                     msg = (
                         f"✅ Berhasil menambahkan premium!\n\n"
                         f"User ID: {target_user_id}\n"
+                        f"Username: @{user_input[1:] if user_input.startswith('@') else 'N/A'}\n"
                         f"Durasi: {duration_text}\n"
                         f"Berakhir: {status['expires']}\n"
                     )
                     await update.message.reply_text(msg)
                     logger.info(f"Admin {update.effective_user.id} added premium to {target_user_id} for {duration}")
+                    
+                    try:
+                        await self.app.bot.send_message(
+                            chat_id=target_user_id,
+                            text=f"🎉 *Selamat!*\n\nAkun Anda telah diupgrade ke premium!\n\n"
+                                 f"Durasi: {duration_text}\n"
+                                 f"Berakhir: {status['expires']}\n\n"
+                                 f"Gunakan /monitor untuk mulai menerima sinyal trading.",
+                            parse_mode='Markdown'
+                        )
+                    except Exception as e:
+                        logger.warning(f"Could not send notification to user {target_user_id}: {e}")
                 else:
                     await update.message.reply_text("❌ Gagal menambahkan premium.")
             else:
                 await update.message.reply_text("❌ User manager tidak tersedia.")
                 
-        except ValueError:
-            await update.message.reply_text("❌ User ID harus berupa angka!")
         except Exception as e:
             logger.error(f"Error adding premium: {e}")
             await update.message.reply_text(f"❌ Error: {str(e)}")

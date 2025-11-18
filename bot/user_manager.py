@@ -68,14 +68,21 @@ class UserManager:
                 logger.info(f"User already exists: {telegram_id}")
                 return existing
             
+            is_admin = telegram_id in self.config.AUTHORIZED_USER_IDS
+            
             user = User(
                 telegram_id=telegram_id,
                 username=username,
                 first_name=first_name,
                 last_name=last_name,
                 is_active=True,
-                is_admin=(telegram_id in self.config.AUTHORIZED_USER_IDS)
+                is_admin=is_admin
             )
+            
+            if not is_admin:
+                user.subscription_tier = 'TRIAL'
+                user.subscription_expires = datetime.utcnow() + timedelta(days=3)
+                logger.info(f"User {telegram_id} assigned 3-day trial (expires: {user.subscription_expires})")
             
             session.add(user)
             session.commit()
@@ -102,7 +109,7 @@ class UserManager:
             user = session.query(User).filter(User.telegram_id == telegram_id).first()
             
             if user:
-                if user.subscription_tier in ['WEEKLY', 'MONTHLY', 'PREMIUM']:
+                if user.subscription_tier in ['TRIAL', 'WEEKLY', 'MONTHLY', 'PREMIUM']:
                     if user.subscription_expires and user.subscription_expires <= datetime.utcnow():
                         user.subscription_tier = 'FREE'
                         user.subscription_expires = None
@@ -113,6 +120,15 @@ class UserManager:
                 session.expunge(user)
             
             return user
+        finally:
+            session.close()
+    
+    def get_user_by_username(self, username: str) -> Optional[int]:
+        session = self.get_session()
+        
+        try:
+            user = session.query(User).filter(User.username == username).first()
+            return user.telegram_id if user else None
         finally:
             session.close()
     
@@ -339,7 +355,7 @@ class UserManager:
             if user.is_admin:
                 return True
             
-            if user.subscription_tier in ['PREMIUM', 'WEEKLY', 'MONTHLY']:
+            if user.subscription_tier in ['TRIAL', 'PREMIUM', 'WEEKLY', 'MONTHLY']:
                 if user.subscription_expires:
                     if user.subscription_expires > datetime.utcnow():
                         return True
@@ -414,7 +430,7 @@ class UserManager:
                     'days_left': None
                 }
             
-            if user.subscription_tier in ['WEEKLY', 'MONTHLY', 'PREMIUM']:
+            if user.subscription_tier in ['TRIAL', 'WEEKLY', 'MONTHLY', 'PREMIUM']:
                 if user.subscription_expires:
                     now = datetime.utcnow()
                     if user.subscription_expires > now:
@@ -422,8 +438,10 @@ class UserManager:
                         jakarta_tz = pytz.timezone('Asia/Jakarta')
                         expires_local = user.subscription_expires.replace(tzinfo=pytz.UTC).astimezone(jakarta_tz)
                         
+                        tier_label = 'TRIAL (3 Hari Gratis)' if user.subscription_tier == 'TRIAL' else user.subscription_tier
+                        
                         return {
-                            'tier': user.subscription_tier,
+                            'tier': tier_label,
                             'status': 'Aktif',
                             'expires': expires_local.strftime('%d/%m/%Y %H:%M'),
                             'days_left': days_left
@@ -490,7 +508,7 @@ class UserManager:
             if user.is_admin or telegram_id in self.config.AUTHORIZED_USER_IDS:
                 return True
             
-            if user.subscription_tier in ['PREMIUM', 'WEEKLY', 'MONTHLY']:
+            if user.subscription_tier in ['TRIAL', 'PREMIUM', 'WEEKLY', 'MONTHLY']:
                 if user.subscription_expires:
                     if user.subscription_expires > datetime.utcnow():
                         return True
