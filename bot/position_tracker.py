@@ -8,12 +8,16 @@ from bot.database import Position, Trade
 logger = setup_logger('PositionTracker')
 
 class PositionTracker:
-    def __init__(self, config, db_manager, risk_manager, alert_system=None, user_manager=None):
+    def __init__(self, config, db_manager, risk_manager, alert_system=None, user_manager=None, 
+                 chart_generator=None, market_data=None, telegram_app=None):
         self.config = config
         self.db = db_manager
         self.risk_manager = risk_manager
         self.alert_system = alert_system
         self.user_manager = user_manager
+        self.chart_generator = chart_generator
+        self.market_data = market_data
+        self.telegram_app = telegram_app
         self.active_positions = {}
         self.monitoring = False
         
@@ -129,7 +133,75 @@ class PositionTracker:
             
             logger.info(f"Position closed: ID={position_id}, Reason={reason}, P/L=${actual_pl:.2f}")
             
-            if self.alert_system and trade:
+            if self.config.AUTHORIZED_USER_IDS and self.telegram_app and self.chart_generator and self.market_data:
+                try:
+                    df_m1 = await self.market_data.get_historical_data('M1', 100)
+                    
+                    if df_m1 is not None and len(df_m1) >= 30:
+                        exit_signal = {
+                            'signal': signal_type,
+                            'entry_price': entry_price,
+                            'stop_loss': pos['stop_loss'],
+                            'take_profit': pos['take_profit'],
+                            'timeframe': 'M1'
+                        }
+                        
+                        chart_path = self.chart_generator.generate_chart(df_m1, exit_signal, 'M1')
+                        
+                        result_emoji = '✅' if trade.result == 'WIN' else '❌'
+                        exit_label = "TRADE_EXIT" if reason == "TP_HIT" else "Trade LOSS"
+                        
+                        exit_msg = (
+                            f"{result_emoji} *{exit_label}*\n\n"
+                            f"Type: {signal_type}\n"
+                            f"Entry: ${entry_price:.2f}\n"
+                            f"Exit: ${exit_price:.2f}\n"
+                            f"P/L: ${actual_pl:.2f}"
+                        )
+                        
+                        for user_id in self.config.AUTHORIZED_USER_IDS:
+                            try:
+                                await self.telegram_app.bot.send_message(
+                                    chat_id=user_id,
+                                    text=exit_msg,
+                                    parse_mode='Markdown'
+                                )
+                                
+                                if chart_path:
+                                    with open(chart_path, 'rb') as photo:
+                                        await self.telegram_app.bot.send_photo(
+                                            chat_id=user_id, 
+                                            photo=photo,
+                                            caption=f"Chart Exit - {signal_type} @ ${exit_price:.2f}"
+                                        )
+                                    
+                                    if self.config.CHART_AUTO_DELETE:
+                                        await asyncio.sleep(2)
+                                        self.chart_generator.delete_chart(chart_path)
+                                        logger.info(f"Auto-deleted exit chart: {chart_path}")
+                            except Exception as e:
+                                logger.error(f"Failed to send exit notification to user {user_id}: {e}")
+                    else:
+                        logger.warning(f"Not enough candles for exit chart: {len(df_m1) if df_m1 else 0}")
+                        
+                        if self.alert_system and trade:
+                            await self.alert_system.send_trade_exit_alert({
+                                'signal_type': signal_type,
+                                'entry_price': entry_price,
+                                'exit_price': exit_price,
+                                'actual_pl': actual_pl
+                            }, trade.result)
+                except Exception as e:
+                    logger.error(f"Error sending exit chart: {e}")
+                    
+                    if self.alert_system and trade:
+                        await self.alert_system.send_trade_exit_alert({
+                            'signal_type': signal_type,
+                            'entry_price': entry_price,
+                            'exit_price': exit_price,
+                            'actual_pl': actual_pl
+                        }, trade.result)
+            elif self.alert_system and trade:
                 await self.alert_system.send_trade_exit_alert({
                     'signal_type': signal_type,
                     'entry_price': entry_price,

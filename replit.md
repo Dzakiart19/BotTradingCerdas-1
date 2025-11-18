@@ -15,7 +15,48 @@ Bot trading XAUUSD otomatis dengan fitur lengkap versi 2:
 
 ## Perubahan Terbaru (18 November 2025 - Latest)
 
-### 🎉 VERSION 2.0 - Sistem Premium & Chart Indikator (18 Nov 2025 - Latest)
+### 🎉 VERSION 2.1 - Auto Monitoring & Chart Exit (18 Nov 2025 - Latest)
+
+**Fitur Baru V2.1:**
+
+1. **Auto-Start Monitoring:**
+   - Monitoring otomatis aktif saat bot restart/start
+   - Tidak perlu user klik /monitor lagi
+   - Semua authorized users langsung dapat monitoring
+   - Evaluasi 24 jam pertama untuk analisis win rate
+   
+2. **Auto-Build Candles:**
+   - Bot menunggu minimal 30 candles saat startup
+   - Memastikan chart selalu bisa tergenerate
+   - Notifikasi saat candles sudah siap
+   
+3. **Proteksi Sinyal Ganda:**
+   - Tidak bisa kirim sinyal baru jika ada posisi aktif
+   - Berlaku untuk /getsignal manual maupun otomatis
+   - Harus tunggu TP/SL tercapai dulu
+   - Mencegah overlapping positions
+   
+4. **Chart Exit WIN/LOSE:**
+   - Saat posisi close, otomatis kirim chart exit
+   - Chart menampilkan titik entry, SL, dan TP
+   - Dilengkapi dengan pesan WIN ✅ atau LOSS ❌
+   - Auto-delete chart setelah dikirim
+   
+5. **Pesan Trial/Premium Diperbaiki:**
+   - Pesan akses ditolak lebih informatif
+   - Mengarahkan langsung ke admin @dzeckyete
+   - Info paket premium lebih jelas
+   - User tahu apa yang harus dilakukan
+
+**Alur Kerja Baru:**
+1. Bot start → Auto wait 30 candles
+2. Auto-start monitoring untuk semua user
+3. Deteksi sinyal → Kirim dengan chart
+4. Monitor posisi hingga TP/SL
+5. Kirim hasil WIN/LOSE + chart exit
+6. Baru bisa accept sinyal berikutnya
+
+### 🎉 VERSION 2.0 - Sistem Premium & Chart Indikator (18 Nov 2025)
 
 **Fitur Baru V2:**
 

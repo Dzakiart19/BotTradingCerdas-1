@@ -4,7 +4,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from datetime import datetime, timedelta
 import pytz
 import pandas as pd
-from typing import Optional
+from typing import Optional, List
 from bot.logger import setup_logger
 from bot.database import Trade, Position, Performance
 
@@ -26,6 +26,7 @@ class TradingBot:
         self.user_manager = user_manager
         self.app = None
         self.monitoring = False
+        self.monitoring_chats = []
         
     def is_authorized(self, user_id: int) -> bool:
         if self.user_manager:
@@ -52,7 +53,18 @@ class TradingBot:
             self.user_manager.update_user_activity(update.effective_user.id)
         
         if not self.is_authorized(update.effective_user.id):
-            await update.message.reply_text("⛔ Anda tidak memiliki akses ke bot ini.")
+            expired_msg = (
+                "⛔ *Akses Ditolak*\n\n"
+                "Anda tidak memiliki akses ke bot ini atau masa trial Anda telah berakhir.\n\n"
+                "💎 *Untuk menggunakan bot:*\n"
+                "Hubungi admin untuk upgrade ke premium:\n"
+                "@dzeckyete\n\n"
+                "*Paket Premium:*\n"
+                "• 1 Minggu: Rp 15.000\n"
+                "• 1 Bulan: Rp 30.000\n\n"
+                "Setelah pembayaran, admin akan mengaktifkan akses Anda."
+            )
+            await update.message.reply_text(expired_msg, parse_mode='Markdown')
             return
         
         user_status = "Admin (Unlimited)" if self.is_admin(update.effective_user.id) else "User Premium"
@@ -120,34 +132,54 @@ class TradingBot:
         if not self.is_authorized(update.effective_user.id):
             return
         
-        if self.monitoring:
-            await update.message.reply_text("⚠️ Monitoring sudah berjalan!")
+        chat_id = update.effective_chat.id
+        
+        if self.monitoring and chat_id in self.monitoring_chats:
+            await update.message.reply_text("⚠️ Monitoring sudah berjalan untuk Anda!")
             return
         
-        self.monitoring = True
-        await update.message.reply_text("✅ Monitoring dimulai! Bot akan mendeteksi sinyal secara real-time...")
+        if not self.monitoring:
+            self.monitoring = True
         
-        asyncio.create_task(self._monitoring_loop(update.effective_chat.id))
+        if chat_id not in self.monitoring_chats:
+            self.monitoring_chats.append(chat_id)
+            await update.message.reply_text("✅ Monitoring dimulai! Bot akan mendeteksi sinyal secara real-time...")
+            asyncio.create_task(self._monitoring_loop(chat_id))
+    
+    async def auto_start_monitoring(self, chat_ids: List[int]):
+        if not self.monitoring:
+            self.monitoring = True
+        
+        for chat_id in chat_ids:
+            if chat_id not in self.monitoring_chats:
+                self.monitoring_chats.append(chat_id)
+                logger.info(f"Auto-starting monitoring for chat {chat_id}")
+                asyncio.create_task(self._monitoring_loop(chat_id))
     
     async def stopmonitor_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_authorized(update.effective_user.id):
             return
         
-        if not self.monitoring:
-            await update.message.reply_text("⚠️ Monitoring tidak sedang berjalan.")
-            return
+        chat_id = update.effective_chat.id
         
-        self.monitoring = False
-        await update.message.reply_text("🛑 Monitoring dihentikan.")
+        if chat_id in self.monitoring_chats:
+            self.monitoring_chats.remove(chat_id)
+            await update.message.reply_text("🛑 Monitoring dihentikan untuk Anda.")
+            
+            if len(self.monitoring_chats) == 0:
+                self.monitoring = False
+                logger.info("All monitoring stopped")
+        else:
+            await update.message.reply_text("⚠️ Monitoring tidak sedang berjalan untuk Anda.")
     
     async def _monitoring_loop(self, chat_id: int):
-        tick_queue = await self.market_data.subscribe_ticks('telegram_bot')
-        logger.info("Monitoring loop subscribed ke tick feed - mode real-time aktif")
+        tick_queue = await self.market_data.subscribe_ticks(f'telegram_bot_{chat_id}')
+        logger.info(f"Monitoring loop subscribed ke tick feed for chat {chat_id} - mode real-time aktif")
         
         last_signal_check = datetime.now() - timedelta(seconds=self.config.SIGNAL_COOLDOWN_SECONDS)
         
         try:
-            while self.monitoring:
+            while self.monitoring and chat_id in self.monitoring_chats:
                 try:
                     tick = await tick_queue.get()
                     
@@ -195,7 +227,9 @@ class TradingBot:
                                     is_valid, validation_msg = self.strategy.validate_signal(signal, spread)
                                     
                                     if is_valid:
-                                        await self._send_signal(chat_id, signal, df_m1)
+                                        for monitoring_chat_id in self.monitoring_chats:
+                                            await self._send_signal(monitoring_chat_id, signal, df_m1)
+                                        
                                         self.risk_manager.record_signal()
                                         last_signal_check = now
                                         
@@ -217,8 +251,8 @@ class TradingBot:
                     await asyncio.sleep(1)
                     
         finally:
-            await self.market_data.unsubscribe_ticks('telegram_bot')
-            logger.info("Monitoring loop unsubscribed dari tick feed")
+            await self.market_data.unsubscribe_ticks(f'telegram_bot_{chat_id}')
+            logger.info(f"Monitoring loop unsubscribed dari tick feed for chat {chat_id}")
     
     async def _send_signal(self, chat_id: int, signal: dict, df: Optional[pd.DataFrame] = None):
         try:
@@ -377,6 +411,16 @@ class TradingBot:
             return
         
         try:
+            if self.position_tracker.has_active_position():
+                await update.message.reply_text(
+                    "⏳ *Tidak Bisa Kirim Sinyal Baru*\n\n"
+                    "Ada posisi aktif yang sedang berjalan. "
+                    "Tunggu sampai TP atau SL tercapai terlebih dahulu.\n\n"
+                    "Gunakan /riwayat untuk melihat posisi aktif.",
+                    parse_mode='Markdown'
+                )
+                return
+            
             await update.message.reply_text("🔍 Generating manual signal...")
             
             current_price = await self.market_data.get_current_price()
@@ -419,7 +463,18 @@ class TradingBot:
             df_m1 = await self.market_data.get_historical_data('M1', 100)
             
             if df_m1 is None or len(df_m1) < 30:
-                logger.info("Not enough local candles for chart, will proceed without chart")
+                logger.info("Not enough local candles for chart, waiting for more data...")
+                await update.message.reply_text("⏳ Menunggu data candle terbentuk (minimal 30 candle)...")
+                
+                for i in range(60):
+                    await asyncio.sleep(1)
+                    df_m1 = await self.market_data.get_historical_data('M1', 100)
+                    if df_m1 is not None and len(df_m1) >= 30:
+                        logger.info(f"Got {len(df_m1)} candles after waiting {i+1}s")
+                        break
+                
+                if df_m1 is None or len(df_m1) < 30:
+                    logger.warning(f"Still not enough candles after 60s wait: {len(df_m1) if df_m1 is not None else 0}")
             
             await self._send_signal(update.effective_chat.id, signal, df_m1)
             
@@ -466,7 +521,18 @@ class TradingBot:
             )
         
         if not self.is_authorized(update.effective_user.id):
-            await update.message.reply_text("⛔ Anda tidak memiliki akses ke bot ini.")
+            expired_msg = (
+                "⛔ *Akses Ditolak*\n\n"
+                "Anda tidak memiliki akses ke bot ini atau masa trial Anda telah berakhir.\n\n"
+                "💎 *Untuk menggunakan bot:*\n"
+                "Hubungi admin untuk upgrade ke premium:\n"
+                "@dzeckyete\n\n"
+                "*Paket Premium:*\n"
+                "• 1 Minggu: Rp 15.000\n"
+                "• 1 Bulan: Rp 30.000\n\n"
+                "Setelah pembayaran, admin akan mengaktifkan akses Anda."
+            )
+            await update.message.reply_text(expired_msg, parse_mode='Markdown')
             return
         
         if self.user_manager:
@@ -616,10 +682,10 @@ class TradingBot:
             logger.error(f"Error adding premium: {e}")
             await update.message.reply_text(f"❌ Error: {str(e)}")
     
-    async def run(self):
+    async def initialize(self):
         if not self.config.TELEGRAM_BOT_TOKEN:
             logger.error("Telegram bot token not configured!")
-            return
+            return False
         
         self.app = Application.builder().token(self.config.TELEGRAM_BOT_TOKEN).build()
         
@@ -635,9 +701,17 @@ class TradingBot:
         self.app.add_handler(CommandHandler("riset", self.riset_command))
         self.app.add_handler(CommandHandler("addpremium", self.addpremium_command))
         
-        logger.info("Telegram bot starting...")
+        logger.info("Initializing Telegram bot...")
         await self.app.initialize()
         await self.app.start()
-        await self.app.updater.start_polling()
+        logger.info("Telegram bot initialized and ready!")
+        return True
+    
+    async def run(self):
+        if not self.app:
+            logger.error("Bot not initialized! Call initialize() first.")
+            return
         
+        logger.info("Starting Telegram bot polling...")
+        await self.app.updater.start_polling()
         logger.info("Telegram bot is running!")

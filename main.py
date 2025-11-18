@@ -58,7 +58,9 @@ class TradingBotOrchestrator:
             self.db_manager, 
             self.risk_manager,
             self.alert_system,
-            self.user_manager
+            self.user_manager,
+            self.chart_generator,
+            self.market_data
         )
         logger.info("Position tracker initialized")
         
@@ -167,26 +169,43 @@ class TradingBotOrchestrator:
                 self.position_tracker.monitor_positions(self.market_data)
             )
             
-            logger.info("Starting Telegram bot...")
-            if self.config.AUTHORIZED_USER_IDS:
-                self.alert_system.set_telegram_app(
-                    self.telegram_bot.app if hasattr(self.telegram_bot, 'app') else None,
-                    self.config.AUTHORIZED_USER_IDS
-                )
+            logger.info("Initializing Telegram bot...")
+            bot_initialized = await self.telegram_bot.initialize()
             
-            bot_task = asyncio.create_task(self.telegram_bot.run())
-            
-            await asyncio.sleep(2)
+            if not bot_initialized:
+                logger.error("Failed to initialize Telegram bot!")
+                return
             
             if self.telegram_bot.app and self.config.AUTHORIZED_USER_IDS:
+                self.alert_system.set_telegram_app(
+                    self.telegram_bot.app,
+                    self.config.AUTHORIZED_USER_IDS
+                )
                 self.alert_system.telegram_app = self.telegram_bot.app
-                
+                self.position_tracker.telegram_app = self.telegram_bot.app
+                logger.info("Telegram app set for alert system and position tracker")
+            
+            logger.info("Starting Telegram bot polling...")
+            bot_task = asyncio.create_task(self.telegram_bot.run())
+            
+            logger.info("Waiting for candles to build (minimal 30 candles)...")
+            for i in range(60):
+                await asyncio.sleep(1)
+                df_check = await self.market_data.get_historical_data('M1', 100)
+                if df_check is not None and len(df_check) >= 30:
+                    logger.info(f"✅ Got {len(df_check)} candles, ready for trading!")
+                    break
+                if i % 10 == 0:
+                    logger.info(f"Building candles... {i}s elapsed")
+            
+            if self.config.AUTHORIZED_USER_IDS:
                 startup_msg = (
                     "🤖 *Bot Started Successfully*\n\n"
                     f"Mode: {'DRY RUN' if self.config.DRY_RUN else 'LIVE'}\n"
                     f"Market: {'Connected' if self.market_data.is_connected() else 'Connecting...'}\n"
-                    f"Status: Monitoring for signals\n\n"
-                    "Use /help for commands"
+                    f"Status: Auto-monitoring AKTIF ✅\n\n"
+                    "Bot akan otomatis mendeteksi sinyal trading.\n"
+                    "Gunakan /help untuk list command"
                 )
                 
                 for user_id in self.config.AUTHORIZED_USER_IDS:
@@ -198,6 +217,9 @@ class TradingBotOrchestrator:
                         )
                     except Exception as e:
                         logger.error(f"Failed to send startup message to user {user_id}: {e}")
+                
+                logger.info("Auto-starting monitoring for authorized users...")
+                await self.telegram_bot.auto_start_monitoring(self.config.AUTHORIZED_USER_IDS)
             
             logger.info("=" * 60)
             logger.info("BOT IS NOW RUNNING")
