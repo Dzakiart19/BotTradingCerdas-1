@@ -25,12 +25,18 @@ class TradingStrategy:
             stoch_k_prev = indicators.get('stoch_k_prev')
             stoch_d_prev = indicators.get('stoch_d_prev')
             
+            macd = indicators.get('macd')
+            macd_signal = indicators.get('macd_signal')
+            macd_histogram = indicators.get('macd_histogram')
+            macd_prev = indicators.get('macd_prev')
+            macd_signal_prev = indicators.get('macd_signal_prev')
+            
             atr = indicators.get('atr')
             close = indicators.get('close')
             volume = indicators.get('volume')
             volume_avg = indicators.get('volume_avg')
             
-            if None in [ema_short, ema_mid, ema_long, rsi, stoch_k, stoch_d, atr, close]:
+            if None in [ema_short, ema_mid, ema_long, rsi, macd, macd_signal, atr, close]:
                 logger.warning("Missing required indicators")
                 return None
             
@@ -46,6 +52,17 @@ class TradingStrategy:
             ema_crossover_bearish = (ema_short is not None and ema_mid is not None and 
                                      ema_short < ema_mid and 
                                      abs(ema_short - ema_mid) / ema_mid < 0.001)
+            
+            macd_bullish_crossover = False
+            macd_bearish_crossover = False
+            if macd_prev is not None and macd_signal_prev is not None:
+                macd_bullish_crossover = (macd_prev <= macd_signal_prev and macd > macd_signal)
+                macd_bearish_crossover = (macd_prev >= macd_signal_prev and macd < macd_signal)
+            
+            macd_bullish = macd > macd_signal
+            macd_bearish = macd < macd_signal
+            macd_above_zero = macd > 0
+            macd_below_zero = macd < 0
             
             rsi_oversold_crossup = False
             rsi_overbought_crossdown = False
@@ -69,21 +86,23 @@ class TradingStrategy:
                 volume_strong = volume > volume_avg * self.config.VOLUME_THRESHOLD_MULTIPLIER
             
             if signal_source == 'auto':
-                if (ema_trend_bullish and ema_crossover_bullish and rsi_bullish and 
-                    stoch_bullish and volume_strong):
+                if (ema_trend_bullish and macd_bullish_crossover and rsi_bullish and volume_strong):
                     signal = 'BUY'
-                    confidence_reasons.append("EMA trend bullish dengan crossover")
+                    confidence_reasons.append("EMA trend bullish")
+                    confidence_reasons.append("MACD bullish crossover (konfirmasi kuat)")
                     confidence_reasons.append("RSI di atas 50 (momentum bullish)")
-                    confidence_reasons.append("Stochastic crossover bullish")
+                    if stoch_bullish:
+                        confidence_reasons.append("Stochastic konfirmasi bullish")
                     if volume_strong:
                         confidence_reasons.append("Volume tinggi konfirmasi")
                         
-                elif (ema_trend_bearish and ema_crossover_bearish and rsi_bearish and 
-                      stoch_bearish and volume_strong):
+                elif (ema_trend_bearish and macd_bearish_crossover and rsi_bearish and volume_strong):
                     signal = 'SELL'
-                    confidence_reasons.append("EMA trend bearish dengan crossover")
+                    confidence_reasons.append("EMA trend bearish")
+                    confidence_reasons.append("MACD bearish crossover (konfirmasi kuat)")
                     confidence_reasons.append("RSI di bawah 50 (momentum bearish)")
-                    confidence_reasons.append("Stochastic crossover bearish")
+                    if stoch_bearish:
+                        confidence_reasons.append("Stochastic konfirmasi bearish")
                     if volume_strong:
                         confidence_reasons.append("Volume tinggi konfirmasi")
             else:
@@ -93,9 +112,12 @@ class TradingStrategy:
                 rsi_condition_bullish = rsi_oversold_crossup or rsi_bullish
                 rsi_condition_bearish = rsi_overbought_crossdown or rsi_bearish
                 
-                if ema_condition_bullish and rsi_condition_bullish:
+                if ema_condition_bullish and macd_bullish and rsi_condition_bullish:
                     signal = 'BUY'
                     confidence_reasons.append("Manual: EMA bullish")
+                    confidence_reasons.append("MACD bullish (konfirmasi)")
+                    if macd_bullish_crossover:
+                        confidence_reasons.append("MACD fresh crossover")
                     if rsi_oversold_crossup:
                         confidence_reasons.append("RSI keluar dari oversold")
                     elif rsi_bullish:
@@ -103,9 +125,12 @@ class TradingStrategy:
                     if stoch_bullish:
                         confidence_reasons.append("Stochastic konfirmasi bullish")
                         
-                elif ema_condition_bearish and rsi_condition_bearish:
+                elif ema_condition_bearish and macd_bearish and rsi_condition_bearish:
                     signal = 'SELL'
                     confidence_reasons.append("Manual: EMA bearish")
+                    confidence_reasons.append("MACD bearish (konfirmasi)")
+                    if macd_bearish_crossover:
+                        confidence_reasons.append("MACD fresh crossover")
                     if rsi_overbought_crossdown:
                         confidence_reasons.append("RSI keluar dari overbought")
                     elif rsi_bearish:
@@ -138,6 +163,9 @@ class TradingStrategy:
                         'ema_mid': float(ema_mid) if ema_mid is not None else None,
                         'ema_long': float(ema_long) if ema_long is not None else None,
                         'rsi': float(rsi) if rsi is not None else None,
+                        'macd': float(macd) if macd is not None else None,
+                        'macd_signal': float(macd_signal) if macd_signal is not None else None,
+                        'macd_histogram': float(macd_histogram) if macd_histogram is not None else None,
                         'stoch_k': float(stoch_k) if stoch_k is not None else None,
                         'stoch_d': float(stoch_d) if stoch_d is not None else None,
                         'atr': float(atr) if atr is not None else None,

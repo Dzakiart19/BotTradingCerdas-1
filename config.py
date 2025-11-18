@@ -17,6 +17,9 @@ class Config:
     STOCH_OVERSOLD_LEVEL = int(os.getenv('STOCH_OVERSOLD_LEVEL', '20'))
     STOCH_OVERBOUGHT_LEVEL = int(os.getenv('STOCH_OVERBOUGHT_LEVEL', '80'))
     ATR_PERIOD = int(os.getenv('ATR_PERIOD', '14'))
+    MACD_FAST = int(os.getenv('MACD_FAST', '12'))
+    MACD_SLOW = int(os.getenv('MACD_SLOW', '26'))
+    MACD_SIGNAL = int(os.getenv('MACD_SIGNAL', '9'))
     VOLUME_THRESHOLD_MULTIPLIER = float(os.getenv('VOLUME_THRESHOLD_MULTIPLIER', '0.5'))
     MAX_SPREAD_PIPS = float(os.getenv('MAX_SPREAD_PIPS', '10.0'))
     
@@ -29,6 +32,11 @@ class Config:
     MAX_TRADES_PER_DAY = int(os.getenv('MAX_TRADES_PER_DAY', '999999'))
     DAILY_LOSS_PERCENT = float(os.getenv('DAILY_LOSS_PERCENT', '3.0'))
     RISK_PER_TRADE_PERCENT = float(os.getenv('RISK_PER_TRADE_PERCENT', '0.5'))
+    
+    DYNAMIC_SL_LOSS_THRESHOLD = float(os.getenv('DYNAMIC_SL_LOSS_THRESHOLD', '1.0'))
+    DYNAMIC_SL_TIGHTENING_MULTIPLIER = float(os.getenv('DYNAMIC_SL_TIGHTENING_MULTIPLIER', '0.5'))
+    TRAILING_STOP_PROFIT_THRESHOLD = float(os.getenv('TRAILING_STOP_PROFIT_THRESHOLD', '1.0'))
+    TRAILING_STOP_DISTANCE_PIPS = float(os.getenv('TRAILING_STOP_DISTANCE_PIPS', '5.0'))
     
     CHART_AUTO_DELETE = os.getenv('CHART_AUTO_DELETE', 'true').lower() == 'true'
     CHART_EXPIRY_MINUTES = int(os.getenv('CHART_EXPIRY_MINUTES', '60'))

@@ -69,12 +69,52 @@ class PositionTracker:
         
         unrealized_pl = self.risk_manager.calculate_pl(entry_price, current_price, signal_type)
         
+        new_stop_loss = stop_loss
+        sl_adjusted = False
+        
+        if unrealized_pl < 0 and abs(unrealized_pl) >= self.config.DYNAMIC_SL_LOSS_THRESHOLD:
+            original_sl_distance = abs(entry_price - stop_loss)
+            new_sl_distance = original_sl_distance * self.config.DYNAMIC_SL_TIGHTENING_MULTIPLIER
+            
+            if signal_type == 'BUY':
+                new_stop_loss = entry_price - new_sl_distance
+                if new_stop_loss > stop_loss:
+                    pos['stop_loss'] = new_stop_loss
+                    sl_adjusted = True
+                    logger.info(f"🔴 Dynamic SL activated! Loss ${abs(unrealized_pl):.2f} >= ${self.config.DYNAMIC_SL_LOSS_THRESHOLD}. SL adjusted from ${stop_loss:.2f} to ${new_stop_loss:.2f}")
+            else:
+                new_stop_loss = entry_price + new_sl_distance
+                if new_stop_loss < stop_loss:
+                    pos['stop_loss'] = new_stop_loss
+                    sl_adjusted = True
+                    logger.info(f"🔴 Dynamic SL activated! Loss ${abs(unrealized_pl):.2f} >= ${self.config.DYNAMIC_SL_LOSS_THRESHOLD}. SL adjusted from ${stop_loss:.2f} to ${new_stop_loss:.2f}")
+        
+        elif unrealized_pl > 0 and unrealized_pl >= self.config.TRAILING_STOP_PROFIT_THRESHOLD:
+            trailing_distance = self.config.TRAILING_STOP_DISTANCE_PIPS / self.config.XAUUSD_PIP_VALUE
+            
+            if signal_type == 'BUY':
+                new_trailing_sl = current_price - trailing_distance
+                if new_trailing_sl > stop_loss:
+                    pos['stop_loss'] = new_trailing_sl
+                    sl_adjusted = True
+                    logger.info(f"🟢 Trailing stop activated! Profit ${unrealized_pl:.2f}. SL moved to ${new_trailing_sl:.2f}")
+            else:
+                new_trailing_sl = current_price + trailing_distance
+                if new_trailing_sl < stop_loss:
+                    pos['stop_loss'] = new_trailing_sl
+                    sl_adjusted = True
+                    logger.info(f"🟢 Trailing stop activated! Profit ${unrealized_pl:.2f}. SL moved to ${new_trailing_sl:.2f}")
+        
+        stop_loss = pos['stop_loss']
+        
         session = self.db.get_session()
         try:
             position = session.query(Position).filter(Position.id == position_id).first()
             if position:
                 position.current_price = current_price
                 position.unrealized_pl = unrealized_pl
+                if sl_adjusted:
+                    position.stop_loss = stop_loss
                 session.commit()
         except Exception as e:
             logger.error(f"Error updating position {position_id}: {e}")
@@ -96,8 +136,9 @@ class PositionTracker:
             await self.close_position(position_id, current_price, 'TP_HIT')
             return 'TP_HIT'
         elif hit_sl:
-            await self.close_position(position_id, current_price, 'SL_HIT')
-            return 'SL_HIT'
+            reason = 'DYNAMIC_SL_HIT' if sl_adjusted else 'SL_HIT'
+            await self.close_position(position_id, current_price, reason)
+            return reason
         
         return None
     

@@ -11,6 +11,9 @@ class IndicatorEngine:
         self.stoch_d_period = config.STOCH_D_PERIOD
         self.stoch_smooth_k = config.STOCH_SMOOTH_K
         self.atr_period = config.ATR_PERIOD
+        self.macd_fast = config.MACD_FAST
+        self.macd_slow = config.MACD_SLOW
+        self.macd_signal = config.MACD_SIGNAL
     
     def calculate_ema(self, df: pd.DataFrame, period: int) -> pd.Series:
         return df['close'].ewm(span=period, adjust=False).mean()
@@ -47,6 +50,14 @@ class IndicatorEngine:
     def calculate_volume_average(self, df: pd.DataFrame, period: int = 20) -> pd.Series:
         return df['volume'].rolling(window=period).mean()
     
+    def calculate_macd(self, df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 9) -> tuple:
+        ema_fast = df['close'].ewm(span=fast, adjust=False).mean()
+        ema_slow = df['close'].ewm(span=slow, adjust=False).mean()
+        macd_line = ema_fast - ema_slow
+        macd_signal = macd_line.ewm(span=signal, adjust=False).mean()
+        macd_histogram = macd_line - macd_signal
+        return macd_line, macd_signal, macd_histogram
+    
     def get_indicators(self, df: pd.DataFrame) -> Optional[Dict]:
         min_required = max(30, max(self.ema_periods + [self.rsi_period, self.stoch_k_period, self.atr_period]) + 10)
         if len(df) < min_required:
@@ -69,6 +80,15 @@ class IndicatorEngine:
         indicators['stoch_d_prev'] = stoch_d.iloc[-2]
         
         indicators['atr'] = self.calculate_atr(df, self.atr_period).iloc[-1]
+        
+        macd_line, macd_signal, macd_histogram = self.calculate_macd(
+            df, self.macd_fast, self.macd_slow, self.macd_signal
+        )
+        indicators['macd'] = macd_line.iloc[-1]
+        indicators['macd_signal'] = macd_signal.iloc[-1]
+        indicators['macd_histogram'] = macd_histogram.iloc[-1]
+        indicators['macd_prev'] = macd_line.iloc[-2]
+        indicators['macd_signal_prev'] = macd_signal.iloc[-2]
         
         indicators['volume'] = df['volume'].iloc[-1]
         indicators['volume_avg'] = self.calculate_volume_average(df).iloc[-1]
