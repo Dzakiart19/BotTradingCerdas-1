@@ -126,19 +126,31 @@ class TradingBot:
                     time_since_last_check = (now - last_signal_check).total_seconds()
                     
                     if time_since_last_check < self.config.SIGNAL_COOLDOWN_SECONDS:
+                        logger.debug(f"⏱️ Cooldown: {time_since_last_check:.1f}s / {self.config.SIGNAL_COOLDOWN_SECONDS}s")
                         continue
                     
+                    logger.info(f"✅ Cooldown passed ({time_since_last_check:.1f}s), fetching candles...")
                     df_m1 = await self.market_data.get_historical_data('M1', 100)
                     
-                    if df_m1 is not None and len(df_m1) >= 50:
+                    if df_m1 is None:
+                        logger.warning("⚠️ get_historical_data returned None")
+                        continue
+                    
+                    candle_count = len(df_m1)
+                    logger.info(f"📈 Got {candle_count} candles from market data")
+                    
+                    if candle_count >= 10:
+                        logger.info(f"📊 Analyzing {len(df_m1)} M1 candles for signals...")
                         from bot.indicators import IndicatorEngine
                         indicator_engine = IndicatorEngine(self.config)
                         indicators = indicator_engine.get_indicators(df_m1)
                         
                         if indicators:
+                            logger.info("🔍 Indicators calculated, checking for signals...")
                             signal = self.strategy.detect_signal(indicators, 'M1')
                             
                             if signal:
+                                logger.info(f"🚨 Signal detected: {signal['signal']}")
                                 can_trade, rejection_reason = self.risk_manager.can_trade(signal['signal'])
                                 
                                 if can_trade:
@@ -156,9 +168,15 @@ class TradingBot:
                                         if self.user_manager:
                                             self.user_manager.update_user_activity(chat_id)
                                     else:
-                                        logger.info(f"Signal validation failed: {validation_msg}")
+                                        logger.info(f"❌ Signal validation failed: {validation_msg}")
                                 else:
-                                    logger.info(f"Trade rejected: {rejection_reason}")
+                                    logger.info(f"⛔ Trade rejected: {rejection_reason}")
+                            else:
+                                logger.debug("No signal detected in current candles")
+                        else:
+                            logger.warning("⚠️ Failed to calculate indicators - not enough data")
+                    else:
+                        logger.warning(f"❌ Not enough candles: {candle_count}/10")
                     
                 except Exception as e:
                     logger.error(f"Error processing tick dalam monitoring loop: {e}")
