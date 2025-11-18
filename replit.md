@@ -63,10 +63,40 @@ The bot's architecture is modular, designed for scalability and maintainability.
 -   **Database:** SQLite for lightweight, embedded data storage with auto-migration support.
 -   **Deployment:** Designed for Koyeb and Replit, with Dockerfile using Debian Trixie compatible libraries (`libgl1` instead of `libgl1-mesa-glx`).
 
-## Recent Changes (V2.4 - Dynamic Profit System)
+## Recent Changes (V2.5 - Multi-User Support System)
 **Date:** November 18, 2025
 
-**Major Enhancement: Dynamic Take Profit Based on Trend Strength**
+**Major Enhancement: Per-User Position Tracking & Risk Management**
+1. **Multi-User Position Tracking:**
+   - Setiap user sekarang memiliki position tracking sendiri (nested dict: {user_id: {position_id: data}})
+   - User dapat request signal secara bersamaan tanpa conflict
+   - Active positions disimpan per user_id, bukan global
+   - Database schema diupdate dengan kolom user_id di tabel Trade, Position, dan SignalLog
+   - PositionTracker methods (add_position, update_position, close_position) sekarang require user_id parameter
+
+2. **Per-User Risk Management:**
+   - Signal cooldown dikelola per user (bukan global)
+   - Daily loss limit dihitung per user
+   - Setiap user punya risk tracking independen
+
+3. **Performance Optimization:**
+   - Reduce excessive logging untuk menghemat resource di deployment tier gratis
+   - Logging yang verbose diubah menjadi debug level
+   - Market data tetap shared antar users (efficient)
+   - Optimized monitoring loop untuk reduce beban CPU/memory
+
+4. **Database Migration:**
+   - Auto-migration menambahkan kolom user_id ke semua tabel yang relevan
+   - Backward compatible dengan data existing (default user_id = 0)
+   - Query database sekarang filter berdasarkan user_id untuk isolasi data
+
+5. **User-Specific Commands:**
+   - `/getsignal` - Check posisi aktif user sendiri (bukan global)
+   - `/riwayat` - Hanya tampilkan trade history user sendiri
+   - `/performa` - Statistik performa per user
+   - Monitoring auto-start tetap berjalan per user dengan tracking independen
+
+**V2.4 Changes (Dynamic Profit System):**
 1. **Intelligent Trend Strength Analysis:**
    - Added `calculate_trend_strength()` function that scores market conditions from 0.0 (weak) to 1.0 (very strong)
    - Analyzes 4 key factors with equal weighting (25% each):

@@ -9,17 +9,17 @@ class RiskManager:
     def __init__(self, config, db_manager):
         self.config = config
         self.db = db_manager
-        self.last_signal_time = None
+        self.last_signal_time = {}
         self.daily_stats = {}
         
-    def can_trade(self, signal_type: str) -> tuple[bool, Optional[str]]:
+    def can_trade(self, user_id: int, signal_type: str) -> tuple[bool, Optional[str]]:
         utc_now = datetime.now(pytz.UTC)
         jakarta_tz = pytz.timezone('Asia/Jakarta')
         jakarta_time = utc_now.astimezone(jakarta_tz)
         today_str = jakarta_time.strftime('%Y-%m-%d')
         
-        if self.last_signal_time:
-            time_since_last = (utc_now - self.last_signal_time).total_seconds()
+        if user_id in self.last_signal_time:
+            time_since_last = (utc_now - self.last_signal_time[user_id]).total_seconds()
             if time_since_last < self.config.SIGNAL_COOLDOWN_SECONDS:
                 remaining = self.config.SIGNAL_COOLDOWN_SECONDS - time_since_last
                 return False, f"Cooldown aktif. Tunggu {int(remaining)} detik lagi"
@@ -32,6 +32,7 @@ class RiskManager:
             today_start_utc = today_start.astimezone(pytz.UTC)
             
             daily_pl = session.query(Trade).filter(
+                Trade.user_id == user_id,
                 Trade.signal_time >= today_start_utc,
                 Trade.actual_pl.isnot(None)
             ).with_entities(Trade.actual_pl).all()
@@ -51,9 +52,9 @@ class RiskManager:
         finally:
             session.close()
     
-    def record_signal(self):
-        self.last_signal_time = datetime.now(pytz.UTC)
-        logger.info("Signal recorded, cooldown timer started")
+    def record_signal(self, user_id: int):
+        self.last_signal_time[user_id] = datetime.now(pytz.UTC)
+        logger.debug(f"Signal recorded for user {user_id}, cooldown timer started")
     
     def calculate_position_size(self, account_balance: float, entry_price: float, 
                                stop_loss: float, signal_type: str) -> float:

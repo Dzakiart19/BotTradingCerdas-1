@@ -10,6 +10,7 @@ class Trade(Base):
     __tablename__ = 'trades'
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False)
     ticker = Column(String(20), nullable=False)
     signal_type = Column(String(10), nullable=False)
     signal_source = Column(String(10), default='auto')
@@ -30,6 +31,7 @@ class SignalLog(Base):
     __tablename__ = 'signal_logs'
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False)
     ticker = Column(String(20), nullable=False)
     signal_type = Column(String(10), nullable=False)
     signal_source = Column(String(10), default='auto')
@@ -43,6 +45,7 @@ class Position(Base):
     __tablename__ = 'positions'
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False)
     trade_id = Column(Integer, nullable=False)
     ticker = Column(String(20), nullable=False)
     signal_type = Column(String(10), nullable=False)
@@ -98,6 +101,11 @@ class DatabaseManager:
                     conn.execute(text("ALTER TABLE trades ADD COLUMN signal_source VARCHAR(10) DEFAULT 'auto'"))
                     conn.commit()
                     print("✅ Database migrated: Added signal_source column to trades table")
+                
+                if 'user_id' not in columns:
+                    conn.execute(text("ALTER TABLE trades ADD COLUMN user_id INTEGER DEFAULT 0"))
+                    conn.commit()
+                    print("✅ Database migrated: Added user_id column to trades table")
             except Exception as e:
                 print(f"⚠️ Migration check for trades table: {e}")
             
@@ -109,8 +117,24 @@ class DatabaseManager:
                     conn.execute(text("ALTER TABLE signal_logs ADD COLUMN signal_source VARCHAR(10) DEFAULT 'auto'"))
                     conn.commit()
                     print("✅ Database migrated: Added signal_source column to signal_logs table")
+                
+                if 'user_id' not in columns:
+                    conn.execute(text("ALTER TABLE signal_logs ADD COLUMN user_id INTEGER DEFAULT 0"))
+                    conn.commit()
+                    print("✅ Database migrated: Added user_id column to signal_logs table")
             except Exception as e:
                 print(f"⚠️ Migration check for signal_logs table: {e}")
+            
+            try:
+                result = conn.execute(text("PRAGMA table_info(positions)"))
+                columns = [row[1] for row in result]
+                
+                if 'user_id' not in columns:
+                    conn.execute(text("ALTER TABLE positions ADD COLUMN user_id INTEGER DEFAULT 0"))
+                    conn.commit()
+                    print("✅ Database migrated: Added user_id column to positions table")
+            except Exception as e:
+                print(f"⚠️ Migration check for positions table: {e}")
     
     def get_session(self):
         return self.Session()

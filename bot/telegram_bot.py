@@ -175,7 +175,7 @@ class TradingBot:
     
     async def _monitoring_loop(self, chat_id: int):
         tick_queue = await self.market_data.subscribe_ticks(f'telegram_bot_{chat_id}')
-        logger.info(f"Monitoring loop subscribed ke tick feed for chat {chat_id} - mode real-time aktif")
+        logger.debug(f"Monitoring started for user {chat_id}")
         
         last_signal_check = datetime.now() - timedelta(seconds=self.config.SIGNAL_COOLDOWN_SECONDS)
         
@@ -188,37 +188,28 @@ class TradingBot:
                     time_since_last_check = (now - last_signal_check).total_seconds()
                     
                     if time_since_last_check < self.config.SIGNAL_COOLDOWN_SECONDS:
-                        logger.debug(f"⏱️ Cooldown: {time_since_last_check:.1f}s / {self.config.SIGNAL_COOLDOWN_SECONDS}s")
                         continue
                     
-                    logger.info(f"✅ Cooldown passed ({time_since_last_check:.1f}s), fetching candles...")
                     df_m1 = await self.market_data.get_historical_data('M1', 100)
                     
                     if df_m1 is None:
-                        logger.warning("⚠️ get_historical_data returned None")
                         continue
                     
                     candle_count = len(df_m1)
-                    logger.info(f"📈 Got {candle_count} candles from market data")
                     
                     if candle_count >= 30:
-                        logger.info(f"📊 Analyzing {len(df_m1)} M1 candles for signals...")
                         from bot.indicators import IndicatorEngine
                         indicator_engine = IndicatorEngine(self.config)
                         indicators = indicator_engine.get_indicators(df_m1)
                         
                         if indicators:
-                            logger.info("🔍 Indicators calculated, checking for signals...")
-                            
-                            if self.position_tracker.has_active_position():
-                                logger.info("⏳ Posisi aktif sedang berjalan - menunggu TP/SL tercapai...")
+                            if self.position_tracker.has_active_position(chat_id):
                                 continue
                             
                             signal = self.strategy.detect_signal(indicators, 'M1', signal_source='auto')
                             
                             if signal:
-                                logger.info(f"🚨 Signal detected: {signal['signal']}")
-                                can_trade, rejection_reason = self.risk_manager.can_trade(signal['signal'])
+                                can_trade, rejection_reason = self.risk_manager.can_trade(chat_id, signal['signal'])
                                 
                                 if can_trade:
                                     current_price = await self.market_data.get_current_price()
@@ -229,24 +220,13 @@ class TradingBot:
                                     
                                     if is_valid:
                                         async with self.signal_lock:
-                                            for monitoring_chat_id in self.monitoring_chats:
-                                                await self._send_signal(monitoring_chat_id, signal, df_m1)
+                                            await self._send_signal(chat_id, chat_id, signal, df_m1)
                                         
-                                        self.risk_manager.record_signal()
+                                        self.risk_manager.record_signal(chat_id)
                                         last_signal_check = now
                                         
                                         if self.user_manager:
                                             self.user_manager.update_user_activity(chat_id)
-                                    else:
-                                        logger.info(f"❌ Signal validation failed: {validation_msg}")
-                                else:
-                                    logger.info(f"⛔ Trade rejected: {rejection_reason}")
-                            else:
-                                logger.debug("No signal detected in current candles")
-                        else:
-                            logger.warning("⚠️ Failed to calculate indicators - not enough data")
-                    else:
-                        logger.warning(f"❌ Not enough candles: {candle_count}/30 required for indicator calculation")
                     
                 except Exception as e:
                     logger.error(f"Error processing tick dalam monitoring loop: {e}")
@@ -254,15 +234,16 @@ class TradingBot:
                     
         finally:
             await self.market_data.unsubscribe_ticks(f'telegram_bot_{chat_id}')
-            logger.info(f"Monitoring loop unsubscribed dari tick feed for chat {chat_id}")
+            logger.debug(f"Monitoring stopped for user {chat_id}")
     
-    async def _send_signal(self, chat_id: int, signal: dict, df: Optional[pd.DataFrame] = None):
+    async def _send_signal(self, user_id: int, chat_id: int, signal: dict, df: Optional[pd.DataFrame] = None):
         try:
             session = self.db.get_session()
             
             signal_source = signal.get('signal_source', 'auto')
             
             trade = Trade(
+                user_id=user_id,
                 ticker='XAUUSD',
                 signal_type=signal['signal'],
                 signal_source=signal_source,
@@ -327,13 +308,14 @@ class TradingBot:
                     logger.info(f"Skipping chart - insufficient candles ({len(df) if df is not None else 0}/30)")
             
             await self.position_tracker.add_position(
+                user_id,
                 trade_id,
                 signal['signal'],
                 signal['entry_price'],
                 signal['stop_loss'],
                 signal['take_profit']
             )
-            logger.info(f"Position {trade_id} added to tracker: {signal['signal']} @ ${signal['entry_price']:.2f}")
+            logger.info(f"Trade {trade_id} User:{user_id} {signal['signal']} @${signal['entry_price']:.2f}")
             
         except Exception as e:
             logger.error(f"Error sending signal: {e}")
@@ -346,9 +328,11 @@ class TradingBot:
         if not self.is_authorized(update.effective_user.id):
             return
         
+        user_id = update.effective_user.id
+        
         try:
             session = self.db.get_session()
-            trades = session.query(Trade).order_by(Trade.signal_time.desc()).limit(10).all()
+            trades = session.query(Trade).filter(Trade.user_id == user_id).order_by(Trade.signal_time.desc()).limit(10).all()
             
             if not trades:
                 await update.message.reply_text("📊 Belum ada riwayat trading.")
@@ -384,10 +368,12 @@ class TradingBot:
         if not self.is_authorized(update.effective_user.id):
             return
         
+        user_id = update.effective_user.id
+        
         try:
             session = self.db.get_session()
             
-            all_trades = session.query(Trade).filter(Trade.status == 'CLOSED').all()
+            all_trades = session.query(Trade).filter(Trade.user_id == user_id, Trade.status == 'CLOSED').all()
             
             if not all_trades:
                 await update.message.reply_text("📊 Belum ada data performa.")
@@ -404,6 +390,7 @@ class TradingBot:
             today_utc = today.astimezone(pytz.UTC)
             
             today_trades = session.query(Trade).filter(
+                Trade.user_id == user_id,
                 Trade.signal_time >= today_utc,
                 Trade.status == 'CLOSED'
             ).all()
@@ -434,13 +421,15 @@ class TradingBot:
         if not self.is_authorized(update.effective_user.id):
             return
         
+        user_id = update.effective_user.id
+        
         try:
-            if self.position_tracker and len(self.position_tracker.active_positions) > 0:
+            if self.position_tracker and self.position_tracker.has_active_position(user_id):
                 await update.message.reply_text(
                     "⏳ *Tidak Dapat Membuat Sinyal Baru*\n\n"
-                    "Saat ini ada posisi aktif yang sedang berjalan.\n"
+                    "Saat ini Anda memiliki posisi aktif yang sedang berjalan.\n"
                     "Bot akan tracking hingga TP/SL tercapai.\n\n"
-                    "Tunggu hasil posisi saat ini sebelum request sinyal baru.",
+                    "Tunggu hasil posisi Anda saat ini sebelum request sinyal baru.",
                     parse_mode='Markdown'
                 )
                 return
@@ -497,9 +486,9 @@ class TradingBot:
             
             chat_id = update.effective_chat.id
             async with self.signal_lock:
-                await self._send_signal(chat_id, signal, df_m1)
+                await self._send_signal(user_id, chat_id, signal, df_m1)
             
-            logger.info(f"Manual signal sent to chat {chat_id}: {signal['signal']}")
+            logger.info(f"Manual signal sent to user {user_id}: {signal['signal']}")
             
         except Exception as e:
             logger.error(f"Error in getsignal_command: {e}")

@@ -101,13 +101,13 @@ class MarketDataClient:
     async def subscribe_ticks(self, name: str) -> asyncio.Queue:
         queue = asyncio.Queue(maxsize=100)
         self.subscribers[name] = queue
-        logger.info(f"Subscriber '{name}' registered untuk tick feed")
+        logger.debug(f"Subscriber '{name}' registered untuk tick feed")
         return queue
     
     async def unsubscribe_ticks(self, name: str):
         if name in self.subscribers:
             del self.subscribers[name]
-            logger.info(f"Subscriber '{name}' unregistered dari tick feed")
+            logger.debug(f"Subscriber '{name}' unregistered dari tick feed")
     
     async def _broadcast_tick(self, tick_data: Dict):
         if not self.subscribers:
@@ -137,14 +137,14 @@ class MarketDataClient:
             }
             
             await websocket.send(json.dumps(history_request))
-            logger.info(f"📥 Requesting {count} historical M{timeframe_minutes} candles...")
+            logger.debug(f"Requesting {count} historical M{timeframe_minutes} candles...")
             
             response = await websocket.recv()
             data = json.loads(response)
             
             if 'candles' in data:
                 candles = data['candles']
-                logger.info(f"✅ Received {len(candles)} historical candles from Deriv API")
+                logger.info(f"Received {len(candles)} historical M{timeframe_minutes} candles")
                 
                 builder = self.m1_builder if timeframe_minutes == 1 else self.m5_builder
                 
@@ -167,7 +167,7 @@ class MarketDataClient:
                     }
                     builder.candles.append(candle_data)
                 
-                logger.info(f"🚀 Pre-populated {len(builder.candles)} M{timeframe_minutes} candles - ready!")
+                logger.info(f"Pre-populated {len(builder.candles)} M{timeframe_minutes} candles")
                 return True
             else:
                 logger.warning(f"No historical candles in response: {data}")
