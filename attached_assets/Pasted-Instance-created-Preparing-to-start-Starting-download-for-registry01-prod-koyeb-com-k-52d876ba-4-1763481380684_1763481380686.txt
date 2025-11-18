@@ -1,0 +1,378 @@
+Instance created. Preparing to start...
+Starting download for registry01.prod.koyeb.com/k-52d876ba-41d5-4c8c-8e13-18cfc19e8371/82cdd60c-0d3e-4b06-9141-6b1abd102cc2:5d50eaa1-9d4a-4bce-ab0d-77e2b869b6c7
+Download progress: 100% |[32m++++++++[0m| (28.9 MiB/s)
+2025-11-18 15:54:41 - Main - INFO - Validating configuration...
+2025-11-18 15:54:41 - Main - INFO - Configuration validated successfully
+2025-11-18 15:54:41 - Main - INFO - Initializing Trading Bot components...
+2025-11-18 15:54:41 - Main - INFO - Database initialized
+2025-11-18 15:54:41 - Main - INFO - Error handler initialized
+2025-11-18 15:54:41 - UserManager - INFO - User manager initialized
+2025-11-18 15:54:41 - Main - INFO - User manager initialized
+2025-11-18 15:54:41 - MarketData - INFO - Pub/Sub mechanism initialized
+2025-11-18 15:54:41 - Main - INFO - Market data client initialized
+2025-11-18 15:54:41 - Main - INFO - Trading strategy initialized
+2025-11-18 15:54:41 - Main - INFO - Risk manager initialized
+2025-11-18 15:54:41 - Main - INFO - Chart generator initialized
+2025-11-18 15:54:41 - AlertSystem - INFO - Alert system initialized
+2025-11-18 15:54:41 - Main - INFO - Alert system initialized
+2025-11-18 15:54:41 - Main - INFO - Position tracker initialized
+2025-11-18 15:54:41 - Main - INFO - Telegram bot initialized
+2025-11-18 15:54:41 - TaskScheduler - INFO - Task scheduler initialized
+2025-11-18 15:54:41 - Main - INFO - Task scheduler initialized
+2025-11-18 15:54:41 - Main - INFO - All components initialized successfully
+2025-11-18 15:54:41 - Main - INFO - ============================================================
+2025-11-18 15:54:41 - Main - INFO - XAUUSD TRADING BOT STARTING
+2025-11-18 15:54:41 - Main - INFO - ============================================================
+2025-11-18 15:54:41 - Main - INFO - Mode: LIVE
+2025-11-18 15:54:41 - Main - INFO - Telegram Bot Token: Configured
+2025-11-18 15:54:41 - Main - INFO - Authorized Users: 1
+2025-11-18 15:54:41 - Main - INFO - ============================================================
+2025-11-18 15:54:41 - Main - INFO - Starting health check server...
+2025-11-18 15:54:41 - Main - INFO - Health check server started on port 8080
+2025-11-18 15:54:41 - Main - INFO - Connecting to market data feed...
+2025-11-18 15:54:41 - Main - INFO - Waiting for initial market data...
+2025-11-18 15:54:41 - MarketData - INFO - Connecting to Deriv WebSocket: wss://ws.derivws.com/websockets/v3?app_id=1089
+2025-11-18 15:54:42 - Main - INFO - Still waiting for market data... (0s)
+2025-11-18 15:54:43 - MarketData - INFO - ✅ Connected to Deriv WebSocket
+2025-11-18 15:54:43 - MarketData - INFO - 📥 Requesting 100 historical M1 candles...
+2025-11-18 15:54:43 - MarketData - INFO - ✅ Received 100 historical candles from Deriv API
+2025-11-18 15:54:43 - MarketData - INFO - 🚀 Pre-populated 100 M1 candles - ready!
+2025-11-18 15:54:43 - MarketData - INFO - 📥 Requesting 100 historical M5 candles...
+2025-11-18 15:54:43 - MarketData - INFO - ✅ Received 100 historical candles from Deriv API
+2025-11-18 15:54:43 - MarketData - INFO - 🚀 Pre-populated 100 M5 candles - ready!
+2025-11-18 15:54:43 - MarketData - INFO - 📡 Subscribed to frxXAUUSD
+2025-11-18 15:54:43 - Main - INFO - Market data connection established
+2025-11-18 15:54:43 - Main - INFO - Setting up scheduled tasks...
+2025-11-18 15:54:43 - TaskScheduler - INFO - Setting up default scheduled tasks
+2025-11-18 15:54:43 - TaskScheduler - INFO - Task added: cleanup_charts (interval=3600s, schedule=None)
+2025-11-18 15:54:43 - TaskScheduler - INFO - Task added: daily_summary (interval=Nones, schedule=23:55:00)
+2025-11-18 15:54:43 - TaskScheduler - INFO - Task added: database_cleanup (interval=Nones, schedule=02:00:00)
+2025-11-18 15:54:43 - TaskScheduler - INFO - Task added: health_check (interval=300s, schedule=None)
+2025-11-18 15:54:43 - TaskScheduler - INFO - Default tasks setup completed
+2025-11-18 15:54:43 - Main - INFO - Scheduled tasks configured
+2025-11-18 15:54:43 - Main - INFO - Starting task scheduler...
+2025-11-18 15:54:43 - TaskScheduler - INFO - Task scheduler started
+2025-11-18 15:54:43 - Main - INFO - Starting position tracker...
+2025-11-18 15:54:43 - Main - INFO - Initializing Telegram bot...
+2025-11-18 15:54:43 - TelegramBot - INFO - Initializing Telegram bot...
+2025-11-18 15:54:43 - TaskScheduler - INFO - Scheduler loop started
+2025-11-18 15:54:43 - MarketData - INFO - Subscriber 'position_tracker' registered untuk tick feed
+2025-11-18 15:54:43 - PositionTracker - INFO - Position tracker subscribed ke tick feed - monitoring real-time aktif
+2025-11-18 15:54:43 - TaskScheduler - INFO - Executing scheduled task: cleanup_charts
+2025-11-18 15:54:43 - TaskScheduler - INFO - Task completed: cleanup_charts (Total runs: 1)
+2025-11-18 15:54:43 - TaskScheduler - INFO - Executing scheduled task: health_check
+2025-11-18 15:54:43 - TaskScheduler - INFO - Running health check...
+2025-11-18 15:54:43 - MarketData - WARNING - No current price available from WebSocket
+2025-11-18 15:54:43 - TaskScheduler - WARNING - Health check: No price data available
+2025-11-18 15:54:43 - TaskScheduler - INFO - Task completed: health_check (Total runs: 1)
+2025-11-18 15:54:44 - MarketData - INFO - 💰 Tick: Bid=4052.45, Ask=4053.17, Quote=4052.81
+2025-11-18 15:54:44 - Main - ERROR - Error during bot operation: The token `7390867903` was rejected by the server.
+2025-11-18 15:54:44 - ErrorHandler - ERROR - Exception in main_loop: InvalidToken: The token `7390867903` was rejected by the server.
+2025-11-18 15:54:44 - AlertSystem - INFO - Alert queued: SYSTEM_ERROR - ❌ *System Error*
+
+Bot crashed: The token `7390867903` was rejected by the server.
+2025-11-18 15:54:44 - Main - INFO - ============================================================
+2025-11-18 15:54:44 - Main - INFO - SHUTTING DOWN BOT...
+2025-11-18 15:54:44 - Main - INFO - ============================================================
+2025-11-18 15:54:44 - Main - ERROR - Failed to send shutdown message: Not Found
+2025-11-18 15:54:44 - Main - INFO - Stopping Telegram bot...
+2025-11-18 15:54:44 - TelegramBot - INFO - Stopping Telegram bot polling...
+2025-11-18 15:54:44 - TelegramBot - ERROR - Error stopping app: This Application is not running!
+2025-11-18 15:54:44 - TelegramBot - INFO - Telegram bot application shutdown complete
+2025-11-18 15:54:44 - Main - INFO - Stopping position tracker...
+2025-11-18 15:54:44 - PositionTracker - INFO - Position monitoring stopped
+2025-11-18 15:54:44 - Main - INFO - Stopping task scheduler...
+2025-11-18 15:54:44 - TaskScheduler - INFO - Task scheduler stopped
+2025-11-18 15:54:44 - Main - INFO - Stopping market data connection...
+2025-11-18 15:54:44 - MarketData - INFO - MarketData client disconnected
+2025-11-18 15:54:44 - Main - INFO - Closing database connections...
+2025-11-18 15:54:44 - Main - INFO - Stopping health server...
+2025-11-18 15:54:44 - Main - INFO - ============================================================
+2025-11-18 15:54:44 - Main - INFO - BOT SHUTDOWN COMPLETE
+2025-11-18 15:54:44 - Main - INFO - ============================================================
+2025-11-18 15:54:44 - MarketData - INFO - Subscriber 'position_tracker' unregistered dari tick feed
+2025-11-18 15:54:44 - PositionTracker - INFO - Position tracker unsubscribed dari tick feed
+Download complete for registry01.prod.koyeb.com/k-52d876ba-41d5-4c8c-8e13-18cfc19e8371/82cdd60c-0d3e-4b06-9141-6b1abd102cc2:5d50eaa1-9d4a-4bce-ab0d-77e2b869b6c7
+Instance is starting... Waiting for health checks to pass.
+Application exited with code 0
+2025-11-18 15:54:51 - Main - INFO - Validating configuration...
+2025-11-18 15:54:51 - Main - INFO - Configuration validated successfully
+2025-11-18 15:54:51 - Main - INFO - Initializing Trading Bot components...
+2025-11-18 15:54:51 - Main - INFO - Database initialized
+2025-11-18 15:54:51 - Main - INFO - Error handler initialized
+2025-11-18 15:54:51 - UserManager - INFO - User manager initialized
+2025-11-18 15:54:51 - Main - INFO - User manager initialized
+2025-11-18 15:54:51 - MarketData - INFO - Pub/Sub mechanism initialized
+2025-11-18 15:54:51 - Main - INFO - Market data client initialized
+2025-11-18 15:54:51 - Main - INFO - Trading strategy initialized
+2025-11-18 15:54:51 - Main - INFO - Risk manager initialized
+2025-11-18 15:54:51 - Main - INFO - Chart generator initialized
+2025-11-18 15:54:51 - AlertSystem - INFO - Alert system initialized
+2025-11-18 15:54:51 - Main - INFO - Alert system initialized
+2025-11-18 15:54:51 - Main - INFO - Position tracker initialized
+2025-11-18 15:54:51 - Main - INFO - Telegram bot initialized
+2025-11-18 15:54:51 - TaskScheduler - INFO - Task scheduler initialized
+2025-11-18 15:54:51 - Main - INFO - Task scheduler initialized
+2025-11-18 15:54:51 - Main - INFO - All components initialized successfully
+2025-11-18 15:54:51 - Main - INFO - ============================================================
+2025-11-18 15:54:51 - Main - INFO - XAUUSD TRADING BOT STARTING
+2025-11-18 15:54:51 - Main - INFO - ============================================================
+2025-11-18 15:54:51 - Main - INFO - Mode: LIVE
+2025-11-18 15:54:51 - Main - INFO - Telegram Bot Token: Configured
+2025-11-18 15:54:51 - Main - INFO - Authorized Users: 1
+2025-11-18 15:54:51 - Main - INFO - ============================================================
+2025-11-18 15:54:51 - Main - INFO - Starting health check server...
+2025-11-18 15:54:51 - Main - INFO - Health check server started on port 8080
+2025-11-18 15:54:51 - Main - INFO - Connecting to market data feed...
+2025-11-18 15:54:51 - Main - INFO - Waiting for initial market data...
+2025-11-18 15:54:51 - MarketData - INFO - Connecting to Deriv WebSocket: wss://ws.derivws.com/websockets/v3?app_id=1089
+2025-11-18 15:54:51 - MarketData - INFO - ✅ Connected to Deriv WebSocket
+2025-11-18 15:54:51 - MarketData - INFO - 📥 Requesting 100 historical M1 candles...
+2025-11-18 15:54:51 - MarketData - INFO - ✅ Received 100 historical candles from Deriv API
+2025-11-18 15:54:51 - MarketData - INFO - 🚀 Pre-populated 100 M1 candles - ready!
+2025-11-18 15:54:51 - MarketData - INFO - 📥 Requesting 100 historical M5 candles...
+2025-11-18 15:54:51 - MarketData - INFO - ✅ Received 100 historical candles from Deriv API
+2025-11-18 15:54:51 - MarketData - INFO - 🚀 Pre-populated 100 M5 candles - ready!
+2025-11-18 15:54:51 - MarketData - INFO - 📡 Subscribed to frxXAUUSD
+2025-11-18 15:54:52 - Main - INFO - Market data connection established
+2025-11-18 15:54:52 - Main - INFO - Setting up scheduled tasks...
+2025-11-18 15:54:52 - TaskScheduler - INFO - Setting up default scheduled tasks
+2025-11-18 15:54:52 - TaskScheduler - INFO - Task added: cleanup_charts (interval=3600s, schedule=None)
+2025-11-18 15:54:52 - TaskScheduler - INFO - Task added: daily_summary (interval=Nones, schedule=23:55:00)
+2025-11-18 15:54:52 - TaskScheduler - INFO - Task added: database_cleanup (interval=Nones, schedule=02:00:00)
+2025-11-18 15:54:52 - TaskScheduler - INFO - Task added: health_check (interval=300s, schedule=None)
+2025-11-18 15:54:52 - TaskScheduler - INFO - Default tasks setup completed
+2025-11-18 15:54:52 - Main - INFO - Scheduled tasks configured
+2025-11-18 15:54:52 - Main - INFO - Starting task scheduler...
+2025-11-18 15:54:52 - TaskScheduler - INFO - Task scheduler started
+2025-11-18 15:54:52 - Main - INFO - Starting position tracker...
+2025-11-18 15:54:52 - Main - INFO - Initializing Telegram bot...
+2025-11-18 15:54:52 - TelegramBot - INFO - Initializing Telegram bot...
+2025-11-18 15:54:52 - TaskScheduler - INFO - Scheduler loop started
+2025-11-18 15:54:52 - MarketData - INFO - Subscriber 'position_tracker' registered untuk tick feed
+2025-11-18 15:54:52 - PositionTracker - INFO - Position tracker subscribed ke tick feed - monitoring real-time aktif
+2025-11-18 15:54:52 - TaskScheduler - INFO - Executing scheduled task: cleanup_charts
+2025-11-18 15:54:52 - TaskScheduler - INFO - Task completed: cleanup_charts (Total runs: 1)
+2025-11-18 15:54:52 - TaskScheduler - INFO - Executing scheduled task: health_check
+2025-11-18 15:54:52 - TaskScheduler - INFO - Running health check...
+2025-11-18 15:54:52 - MarketData - WARNING - No current price available from WebSocket
+2025-11-18 15:54:52 - TaskScheduler - WARNING - Health check: No price data available
+2025-11-18 15:54:52 - TaskScheduler - INFO - Task completed: health_check (Total runs: 1)
+2025-11-18 15:54:52 - MarketData - INFO - 💰 Tick: Bid=4053.97, Ask=4054.65, Quote=4054.31
+2025-11-18 15:54:52 - Main - ERROR - Error during bot operation: The token `7390867903` was rejected by the server.
+2025-11-18 15:54:52 - ErrorHandler - ERROR - Exception in main_loop: InvalidToken: The token `7390867903` was rejected by the server.
+2025-11-18 15:54:52 - AlertSystem - INFO - Alert queued: SYSTEM_ERROR - ❌ *System Error*
+
+Bot crashed: The token `7390867903` was rejected by the server.
+2025-11-18 15:54:52 - Main - INFO - ============================================================
+2025-11-18 15:54:52 - Main - INFO - SHUTTING DOWN BOT...
+2025-11-18 15:54:52 - Main - INFO - ============================================================
+2025-11-18 15:54:52 - Main - ERROR - Failed to send shutdown message: Not Found
+2025-11-18 15:54:52 - Main - INFO - Stopping Telegram bot...
+2025-11-18 15:54:52 - TelegramBot - INFO - Stopping Telegram bot polling...
+2025-11-18 15:54:52 - TelegramBot - ERROR - Error stopping app: This Application is not running!
+2025-11-18 15:54:52 - TelegramBot - INFO - Telegram bot application shutdown complete
+2025-11-18 15:54:52 - Main - INFO - Stopping position tracker...
+2025-11-18 15:54:52 - PositionTracker - INFO - Position monitoring stopped
+2025-11-18 15:54:52 - Main - INFO - Stopping task scheduler...
+2025-11-18 15:54:52 - TaskScheduler - INFO - Task scheduler stopped
+2025-11-18 15:54:52 - Main - INFO - Stopping market data connection...
+2025-11-18 15:54:52 - MarketData - INFO - MarketData client disconnected
+2025-11-18 15:54:52 - Main - INFO - Closing database connections...
+2025-11-18 15:54:52 - Main - INFO - Stopping health server...
+2025-11-18 15:54:52 - Main - INFO - ============================================================
+2025-11-18 15:54:52 - Main - INFO - BOT SHUTDOWN COMPLETE
+2025-11-18 15:54:52 - Main - INFO - ============================================================
+2025-11-18 15:54:52 - MarketData - INFO - Subscriber 'position_tracker' unregistered dari tick feed
+2025-11-18 15:54:52 - PositionTracker - INFO - Position tracker unsubscribed dari tick feed
+Application exited with code 0
+Instance stopped.
+Instance created. Preparing to start...
+Starting download for registry01.prod.koyeb.com/k-52d876ba-41d5-4c8c-8e13-18cfc19e8371/82cdd60c-0d3e-4b06-9141-6b1abd102cc2:5d50eaa1-9d4a-4bce-ab0d-77e2b869b6c7
+Download progress: 100% |[32m++++++++[0m| (28.9 MiB/s)
+2025-11-18 15:55:11 - Main - INFO - Validating configuration...
+2025-11-18 15:55:11 - Main - INFO - Configuration validated successfully
+2025-11-18 15:55:11 - Main - INFO - Initializing Trading Bot components...
+2025-11-18 15:55:11 - Main - INFO - Database initialized
+2025-11-18 15:55:11 - Main - INFO - Error handler initialized
+2025-11-18 15:55:11 - UserManager - INFO - User manager initialized
+2025-11-18 15:55:11 - Main - INFO - User manager initialized
+2025-11-18 15:55:11 - MarketData - INFO - Pub/Sub mechanism initialized
+2025-11-18 15:55:11 - Main - INFO - Market data client initialized
+2025-11-18 15:55:11 - Main - INFO - Trading strategy initialized
+2025-11-18 15:55:11 - Main - INFO - Risk manager initialized
+2025-11-18 15:55:11 - Main - INFO - Chart generator initialized
+2025-11-18 15:55:11 - AlertSystem - INFO - Alert system initialized
+2025-11-18 15:55:11 - Main - INFO - Alert system initialized
+2025-11-18 15:55:11 - Main - INFO - Position tracker initialized
+2025-11-18 15:55:11 - Main - INFO - Telegram bot initialized
+2025-11-18 15:55:11 - TaskScheduler - INFO - Task scheduler initialized
+2025-11-18 15:55:11 - Main - INFO - Task scheduler initialized
+2025-11-18 15:55:11 - Main - INFO - All components initialized successfully
+2025-11-18 15:55:11 - Main - INFO - ============================================================
+2025-11-18 15:55:11 - Main - INFO - XAUUSD TRADING BOT STARTING
+2025-11-18 15:55:11 - Main - INFO - ============================================================
+2025-11-18 15:55:11 - Main - INFO - Mode: LIVE
+2025-11-18 15:55:11 - Main - INFO - Telegram Bot Token: Configured
+2025-11-18 15:55:11 - Main - INFO - Authorized Users: 1
+2025-11-18 15:55:11 - Main - INFO - ============================================================
+2025-11-18 15:55:11 - Main - INFO - Starting health check server...
+2025-11-18 15:55:11 - Main - INFO - Health check server started on port 8080
+2025-11-18 15:55:11 - Main - INFO - Connecting to market data feed...
+2025-11-18 15:55:11 - Main - INFO - Waiting for initial market data...
+2025-11-18 15:55:11 - MarketData - INFO - Connecting to Deriv WebSocket: wss://ws.derivws.com/websockets/v3?app_id=1089
+2025-11-18 15:55:12 - Main - INFO - Still waiting for market data... (0s)
+2025-11-18 15:55:12 - MarketData - INFO - ✅ Connected to Deriv WebSocket
+2025-11-18 15:55:12 - MarketData - INFO - 📥 Requesting 100 historical M1 candles...
+2025-11-18 15:55:12 - MarketData - INFO - ✅ Received 100 historical candles from Deriv API
+2025-11-18 15:55:12 - MarketData - INFO - 🚀 Pre-populated 100 M1 candles - ready!
+2025-11-18 15:55:12 - MarketData - INFO - 📥 Requesting 100 historical M5 candles...
+2025-11-18 15:55:12 - MarketData - INFO - ✅ Received 100 historical candles from Deriv API
+2025-11-18 15:55:12 - MarketData - INFO - 🚀 Pre-populated 100 M5 candles - ready!
+2025-11-18 15:55:12 - MarketData - INFO - 📡 Subscribed to frxXAUUSD
+Download complete for registry01.prod.koyeb.com/k-52d876ba-41d5-4c8c-8e13-18cfc19e8371/82cdd60c-0d3e-4b06-9141-6b1abd102cc2:5d50eaa1-9d4a-4bce-ab0d-77e2b869b6c7
+Instance is starting... Waiting for health checks to pass.
+2025-11-18 15:55:13 - MarketData - INFO - 💰 Tick: Bid=4053.58, Ask=4054.31, Quote=4053.95
+2025-11-18 15:55:13 - Main - INFO - Market data connection established
+2025-11-18 15:55:13 - Main - INFO - Setting up scheduled tasks...
+2025-11-18 15:55:13 - TaskScheduler - INFO - Setting up default scheduled tasks
+2025-11-18 15:55:13 - TaskScheduler - INFO - Task added: cleanup_charts (interval=3600s, schedule=None)
+2025-11-18 15:55:13 - TaskScheduler - INFO - Task added: daily_summary (interval=Nones, schedule=23:55:00)
+2025-11-18 15:55:13 - TaskScheduler - INFO - Task added: database_cleanup (interval=Nones, schedule=02:00:00)
+2025-11-18 15:55:13 - TaskScheduler - INFO - Task added: health_check (interval=300s, schedule=None)
+2025-11-18 15:55:13 - TaskScheduler - INFO - Default tasks setup completed
+2025-11-18 15:55:13 - Main - INFO - Scheduled tasks configured
+2025-11-18 15:55:13 - Main - INFO - Starting task scheduler...
+2025-11-18 15:55:13 - TaskScheduler - INFO - Task scheduler started
+2025-11-18 15:55:13 - Main - INFO - Starting position tracker...
+2025-11-18 15:55:13 - Main - INFO - Initializing Telegram bot...
+2025-11-18 15:55:13 - TelegramBot - INFO - Initializing Telegram bot...
+2025-11-18 15:55:13 - TaskScheduler - INFO - Scheduler loop started
+2025-11-18 15:55:13 - MarketData - INFO - Subscriber 'position_tracker' registered untuk tick feed
+2025-11-18 15:55:13 - PositionTracker - INFO - Position tracker subscribed ke tick feed - monitoring real-time aktif
+2025-11-18 15:55:13 - TaskScheduler - INFO - Executing scheduled task: cleanup_charts
+2025-11-18 15:55:13 - TaskScheduler - INFO - Task completed: cleanup_charts (Total runs: 1)
+2025-11-18 15:55:13 - TaskScheduler - INFO - Executing scheduled task: health_check
+2025-11-18 15:55:13 - TaskScheduler - INFO - Running health check...
+2025-11-18 15:55:13 - TaskScheduler - INFO - Health check OK - Current price: 4053.9449999999997
+2025-11-18 15:55:13 - TaskScheduler - INFO - Task completed: health_check (Total runs: 1)
+2025-11-18 15:55:13 - Main - ERROR - Error during bot operation: The token `7390867903` was rejected by the server.
+2025-11-18 15:55:13 - ErrorHandler - ERROR - Exception in main_loop: InvalidToken: The token `7390867903` was rejected by the server.
+2025-11-18 15:55:13 - AlertSystem - INFO - Alert queued: SYSTEM_ERROR - ❌ *System Error*
+
+Bot crashed: The token `7390867903` was rejected by the server.
+2025-11-18 15:55:13 - Main - INFO - ============================================================
+2025-11-18 15:55:13 - Main - INFO - SHUTTING DOWN BOT...
+2025-11-18 15:55:13 - Main - INFO - ============================================================
+2025-11-18 15:55:13 - Main - ERROR - Failed to send shutdown message: Not Found
+2025-11-18 15:55:13 - Main - INFO - Stopping Telegram bot...
+2025-11-18 15:55:13 - TelegramBot - INFO - Stopping Telegram bot polling...
+2025-11-18 15:55:13 - TelegramBot - ERROR - Error stopping app: This Application is not running!
+2025-11-18 15:55:13 - TelegramBot - INFO - Telegram bot application shutdown complete
+2025-11-18 15:55:13 - Main - INFO - Stopping position tracker...
+2025-11-18 15:55:13 - PositionTracker - INFO - Position monitoring stopped
+2025-11-18 15:55:13 - Main - INFO - Stopping task scheduler...
+2025-11-18 15:55:13 - TaskScheduler - INFO - Task scheduler stopped
+2025-11-18 15:55:13 - Main - INFO - Stopping market data connection...
+2025-11-18 15:55:13 - MarketData - INFO - MarketData client disconnected
+2025-11-18 15:55:13 - Main - INFO - Closing database connections...
+2025-11-18 15:55:13 - Main - INFO - Stopping health server...
+2025-11-18 15:55:13 - Main - INFO - ============================================================
+2025-11-18 15:55:13 - Main - INFO - BOT SHUTDOWN COMPLETE
+2025-11-18 15:55:13 - Main - INFO - ============================================================
+2025-11-18 15:55:13 - MarketData - INFO - Subscriber 'position_tracker' unregistered dari tick feed
+2025-11-18 15:55:13 - PositionTracker - INFO - Position tracker unsubscribed dari tick feed
+Application exited with code 0
+2025-11-18 15:55:20 - Main - INFO - Validating configuration...
+2025-11-18 15:55:20 - Main - INFO - Configuration validated successfully
+2025-11-18 15:55:20 - Main - INFO - Initializing Trading Bot components...
+2025-11-18 15:55:20 - Main - INFO - Database initialized
+2025-11-18 15:55:20 - Main - INFO - Error handler initialized
+2025-11-18 15:55:20 - UserManager - INFO - User manager initialized
+2025-11-18 15:55:20 - Main - INFO - User manager initialized
+2025-11-18 15:55:20 - MarketData - INFO - Pub/Sub mechanism initialized
+2025-11-18 15:55:20 - Main - INFO - Market data client initialized
+2025-11-18 15:55:20 - Main - INFO - Trading strategy initialized
+2025-11-18 15:55:20 - Main - INFO - Risk manager initialized
+2025-11-18 15:55:20 - Main - INFO - Chart generator initialized
+2025-11-18 15:55:20 - AlertSystem - INFO - Alert system initialized
+2025-11-18 15:55:20 - Main - INFO - Alert system initialized
+2025-11-18 15:55:20 - Main - INFO - Position tracker initialized
+2025-11-18 15:55:20 - Main - INFO - Telegram bot initialized
+2025-11-18 15:55:20 - TaskScheduler - INFO - Task scheduler initialized
+2025-11-18 15:55:20 - Main - INFO - Task scheduler initialized
+2025-11-18 15:55:20 - Main - INFO - All components initialized successfully
+2025-11-18 15:55:20 - Main - INFO - ============================================================
+2025-11-18 15:55:20 - Main - INFO - XAUUSD TRADING BOT STARTING
+2025-11-18 15:55:20 - Main - INFO - ============================================================
+2025-11-18 15:55:20 - Main - INFO - Mode: LIVE
+2025-11-18 15:55:20 - Main - INFO - Telegram Bot Token: Configured
+2025-11-18 15:55:20 - Main - INFO - Authorized Users: 1
+2025-11-18 15:55:20 - Main - INFO - ============================================================
+2025-11-18 15:55:20 - Main - INFO - Starting health check server...
+2025-11-18 15:55:20 - Main - INFO - Health check server started on port 8080
+2025-11-18 15:55:20 - Main - INFO - Connecting to market data feed...
+2025-11-18 15:55:20 - Main - INFO - Waiting for initial market data...
+2025-11-18 15:55:20 - MarketData - INFO - Connecting to Deriv WebSocket: wss://ws.derivws.com/websockets/v3?app_id=1089
+2025-11-18 15:55:21 - Main - INFO - Still waiting for market data... (0s)
+2025-11-18 15:55:21 - MarketData - INFO - ✅ Connected to Deriv WebSocket
+2025-11-18 15:55:21 - MarketData - INFO - 📥 Requesting 100 historical M1 candles...
+2025-11-18 15:55:22 - MarketData - INFO - ✅ Received 100 historical candles from Deriv API
+2025-11-18 15:55:22 - MarketData - INFO - 🚀 Pre-populated 100 M1 candles - ready!
+2025-11-18 15:55:22 - MarketData - INFO - 📥 Requesting 100 historical M5 candles...
+2025-11-18 15:55:22 - MarketData - INFO - ✅ Received 100 historical candles from Deriv API
+2025-11-18 15:55:22 - MarketData - INFO - 🚀 Pre-populated 100 M5 candles - ready!
+2025-11-18 15:55:22 - MarketData - INFO - 📡 Subscribed to frxXAUUSD
+2025-11-18 15:55:22 - Main - INFO - Market data connection established
+2025-11-18 15:55:22 - Main - INFO - Setting up scheduled tasks...
+2025-11-18 15:55:22 - TaskScheduler - INFO - Setting up default scheduled tasks
+2025-11-18 15:55:22 - TaskScheduler - INFO - Task added: cleanup_charts (interval=3600s, schedule=None)
+2025-11-18 15:55:22 - TaskScheduler - INFO - Task added: daily_summary (interval=Nones, schedule=23:55:00)
+2025-11-18 15:55:22 - TaskScheduler - INFO - Task added: database_cleanup (interval=Nones, schedule=02:00:00)
+2025-11-18 15:55:22 - TaskScheduler - INFO - Task added: health_check (interval=300s, schedule=None)
+2025-11-18 15:55:22 - TaskScheduler - INFO - Default tasks setup completed
+2025-11-18 15:55:22 - Main - INFO - Scheduled tasks configured
+2025-11-18 15:55:22 - Main - INFO - Starting task scheduler...
+2025-11-18 15:55:22 - TaskScheduler - INFO - Task scheduler started
+2025-11-18 15:55:22 - Main - INFO - Starting position tracker...
+2025-11-18 15:55:22 - Main - INFO - Initializing Telegram bot...
+2025-11-18 15:55:22 - TelegramBot - INFO - Initializing Telegram bot...
+2025-11-18 15:55:22 - TaskScheduler - INFO - Scheduler loop started
+2025-11-18 15:55:22 - MarketData - INFO - Subscriber 'position_tracker' registered untuk tick feed
+2025-11-18 15:55:22 - PositionTracker - INFO - Position tracker subscribed ke tick feed - monitoring real-time aktif
+2025-11-18 15:55:22 - TaskScheduler - INFO - Executing scheduled task: cleanup_charts
+2025-11-18 15:55:22 - TaskScheduler - INFO - Task completed: cleanup_charts (Total runs: 1)
+2025-11-18 15:55:22 - TaskScheduler - INFO - Executing scheduled task: health_check
+2025-11-18 15:55:22 - TaskScheduler - INFO - Running health check...
+2025-11-18 15:55:22 - MarketData - WARNING - No current price available from WebSocket
+2025-11-18 15:55:22 - TaskScheduler - WARNING - Health check: No price data available
+2025-11-18 15:55:22 - TaskScheduler - INFO - Task completed: health_check (Total runs: 1)
+2025-11-18 15:55:23 - Main - ERROR - Error during bot operation: The token `7390867903` was rejected by the server.
+2025-11-18 15:55:23 - ErrorHandler - ERROR - Exception in main_loop: InvalidToken: The token `7390867903` was rejected by the server.
+2025-11-18 15:55:23 - AlertSystem - INFO - Alert queued: SYSTEM_ERROR - ❌ *System Error*
+
+Bot crashed: The token `7390867903` was rejected by the server.
+2025-11-18 15:55:23 - Main - INFO - ============================================================
+2025-11-18 15:55:23 - Main - INFO - SHUTTING DOWN BOT...
+2025-11-18 15:55:23 - Main - INFO - ============================================================
+2025-11-18 15:55:23 - MarketData - INFO - 💰 Tick: Bid=4054.45, Ask=4055.24, Quote=4054.85
+2025-11-18 15:55:23 - Main - ERROR - Failed to send shutdown message: Not Found
+2025-11-18 15:55:23 - Main - INFO - Stopping Telegram bot...
+2025-11-18 15:55:23 - TelegramBot - INFO - Stopping Telegram bot polling...
+2025-11-18 15:55:23 - TelegramBot - ERROR - Error stopping app: This Application is not running!
+2025-11-18 15:55:23 - TelegramBot - INFO - Telegram bot application shutdown complete
+2025-11-18 15:55:23 - Main - INFO - Stopping position tracker...
+2025-11-18 15:55:23 - PositionTracker - INFO - Position monitoring stopped
+2025-11-18 15:55:23 - Main - INFO - Stopping task scheduler...
+2025-11-18 15:55:23 - TaskScheduler - INFO - Task scheduler stopped
+2025-11-18 15:55:23 - Main - INFO - Stopping market data connection...
+2025-11-18 15:55:23 - MarketData - INFO - MarketData client disconnected
+2025-11-18 15:55:23 - Main - INFO - Closing database connections...
+2025-11-18 15:55:23 - Main - INFO - Stopping health server...
+2025-11-18 15:55:23 - Main - INFO - ============================================================
+2025-11-18 15:55:23 - Main - INFO - BOT SHUTDOWN COMPLETE
+2025-11-18 15:55:23 - Main - INFO - ============================================================
+2025-11-18 15:55:23 - MarketData - INFO - Subscriber 'position_tracker' unregistered dari tick feed
+2025-11-18 15:55:23 - PositionTracker - INFO - Position tracker unsubscribed dari tick feed
+Application exited with code 0
+Instance stopped.
