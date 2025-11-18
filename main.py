@@ -198,7 +198,7 @@ class TradingBotOrchestrator:
                 if i % 10 == 0:
                     logger.info(f"Building candles... {i}s elapsed")
             
-            if self.config.AUTHORIZED_USER_IDS:
+            if self.telegram_bot.app and self.config.AUTHORIZED_USER_IDS:
                 startup_msg = (
                     "🤖 *Bot Started Successfully*\n\n"
                     f"Mode: {'DRY RUN' if self.config.DRY_RUN else 'LIVE'}\n"
