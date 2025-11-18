@@ -44,6 +44,7 @@ The bot's architecture is modular, designed for scalability and maintainability.
 -   **Dual Signal Strategy (V2.3):**
     -   **Auto Mode (Strict):** Requires all conditions (EMA trend/crossover, RSI >/< 50, Stochastic confirmation, high volume) to be met (AND logic) for high precision.
     -   **Manual Mode (Relaxed):** Allows for more opportunities with flexible conditions (EMA trend OR crossover, RSI crossover zone OR bullish/bearish, optional Stochastic/Volume) (OR logic).
+    -   **Fallback Logic:** Manual mode gracefully handles missing historical data (rsi_prev, stoch_prev) by using current values only.
 -   **Indicators:** EMA (5, 10, 20), RSI (14), Stochastic (K=14, D=3), ATR (14), Volume (0.5x average confirmation).
 -   **Risk Management:** Dynamic SL (1.0x ATR, min 20 pips), dynamic TP (1.5x R:R, min 30 pips), max spread (5 pips), signal cooldown (120s), daily loss limit (3%), risk per trade (0.5%).
 -   **Subscription System:**
@@ -54,12 +55,25 @@ The bot's architecture is modular, designed for scalability and maintainability.
 -   **Anti-Duplicate Protection:** Prevents new signals if an active position exists, using `asyncio.Lock()` and active position checks.
 -   **Auto-Monitoring & Auto-Build Candles:** Bot automatically starts monitoring and ensures enough historical candles (min 30) are built at startup.
 -   **Chart Generation:** Uses `mplfinance` and `matplotlib` to render multi-panel charts with indicators, handling numpy type conversions, timezone consistency, and NaN values.
+-   **Database Migration:** Auto-migration system checks and adds new columns (e.g., `signal_source`) on startup, ensuring backward compatibility without data loss.
 
 **System Design Choices:**
 -   **Real-time Processing:** Utilizes WebSocket for live tick data from Deriv.
 -   **Asynchronous Operations:** Leverages `asyncio` for efficient handling of concurrent tasks (WebSocket, Telegram, position tracking).
--   **Database:** SQLite for lightweight, embedded data storage.
--   **Deployment:** Designed for Replit, with environment variables managed via Replit Secrets.
+-   **Database:** SQLite for lightweight, embedded data storage with auto-migration support.
+-   **Deployment:** Designed for Koyeb and Replit, with Dockerfile using Debian Trixie compatible libraries (`libgl1` instead of `libgl1-mesa-glx`).
+
+## Recent Changes (V2.3)
+**Date:** November 18, 2025
+
+**Enhancements:**
+1. **Fixed Koyeb Deployment Error:** Replaced `libgl1-mesa-glx` with `libgl1` for Debian Trixie compatibility.
+2. **Dual-Mode Signal Strategy:** Separated automatic (strict) and manual (relaxed) signal generation to prevent spam/conflicts.
+3. **Enhanced Scalping Strategy:** Implemented RSI crossover detection, EMA trend/crossover analysis, Stochastic confirmation, and volume filtering based on proven GitHub strategies (GioxTom RSI Scalping, Alpaca Bot, M1 Countertrend).
+4. **Database Schema Update:** Added `signal_source` field to track auto vs manual signals separately for performance analysis.
+5. **Auto-Migration System:** Database automatically migrates to add new columns without data loss on bot restart.
+6. **Manual Signal Bug Fix:** Added fallback logic to handle missing `rsi_prev` and `stoch_prev` data gracefully, allowing manual signals to work with current values only.
+7. **Enhanced Signal Messages:** Added source icons (🤖 auto / 👤 manual), confidence reasons for educational value.
 
 ## External Dependencies
 -   **Deriv WebSocket API:** For real-time market data (ticks, OHLC candles) for XAUUSD.

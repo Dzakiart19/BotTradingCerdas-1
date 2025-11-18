@@ -83,7 +83,34 @@ class DatabaseManager:
         
         Base.metadata.create_all(self.engine)
         
+        self._migrate_database()
+        
         self.Session = scoped_session(sessionmaker(bind=self.engine))
+    
+    def _migrate_database(self):
+        """Auto-migrate database schema for new columns"""
+        with self.engine.connect() as conn:
+            try:
+                result = conn.execute(text("PRAGMA table_info(trades)"))
+                columns = [row[1] for row in result]
+                
+                if 'signal_source' not in columns:
+                    conn.execute(text("ALTER TABLE trades ADD COLUMN signal_source VARCHAR(10) DEFAULT 'auto'"))
+                    conn.commit()
+                    print("✅ Database migrated: Added signal_source column to trades table")
+            except Exception as e:
+                print(f"⚠️ Migration check for trades table: {e}")
+            
+            try:
+                result = conn.execute(text("PRAGMA table_info(signal_logs)"))
+                columns = [row[1] for row in result]
+                
+                if 'signal_source' not in columns:
+                    conn.execute(text("ALTER TABLE signal_logs ADD COLUMN signal_source VARCHAR(10) DEFAULT 'auto'"))
+                    conn.commit()
+                    print("✅ Database migrated: Added signal_source column to signal_logs table")
+            except Exception as e:
+                print(f"⚠️ Migration check for signal_logs table: {e}")
     
     def get_session(self):
         return self.Session()
