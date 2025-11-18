@@ -3,8 +3,19 @@ import os
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
-def setup_logger(name='TradingBot', log_dir='logs', level=logging.INFO):
+def setup_logger(name='TradingBot', log_dir='logs', level=None):
     os.makedirs(log_dir, exist_ok=True)
+    
+    if level is None:
+        log_level_str = os.getenv('LOG_LEVEL', 'INFO').upper()
+        level_map = {
+            'DEBUG': logging.DEBUG,
+            'INFO': logging.INFO,
+            'WARNING': logging.WARNING,
+            'ERROR': logging.ERROR,
+            'CRITICAL': logging.CRITICAL
+        }
+        level = level_map.get(log_level_str, logging.INFO)
     
     logger = logging.getLogger(name)
     logger.setLevel(level)

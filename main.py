@@ -24,7 +24,17 @@ logger = setup_logger('Main')
 class TradingBotOrchestrator:
     def __init__(self):
         self.config = Config()
+        
+        logger.info("Validating configuration...")
+        try:
+            self.config.validate()
+            logger.info("Configuration validated successfully")
+        except Exception as e:
+            logger.error(f"Configuration validation failed: {e}")
+            raise
+        
         self.running = False
+        self.shutdown_in_progress = False
         self.health_server = None
         
         logger.info("Initializing Trading Bot components...")
@@ -215,8 +225,12 @@ class TradingBotOrchestrator:
                             text=startup_msg,
                             parse_mode='Markdown'
                         )
-                    except Exception as e:
-                        logger.error(f"Failed to send startup message to user {user_id}: {e}")
+                        logger.debug(f"Startup message sent successfully to user {user_id}")
+                    except Exception as telegram_error:
+                        error_type = type(telegram_error).__name__
+                        logger.error(f"Failed to send startup message to user {user_id}: [{error_type}] {telegram_error}")
+                        if self.error_handler:
+                            self.error_handler.log_exception(telegram_error, f"startup_message_user_{user_id}")
                 
                 logger.info("Auto-starting monitoring for authorized users...")
                 await self.telegram_bot.auto_start_monitoring(self.config.AUTHORIZED_USER_IDS)
@@ -240,9 +254,11 @@ class TradingBotOrchestrator:
             await self.shutdown()
     
     async def shutdown(self):
-        if not self.running:
+        if not self.running or self.shutdown_in_progress:
+            logger.debug("Shutdown already in progress or bot not running, skipping.")
             return
         
+        self.shutdown_in_progress = True
         logger.info("=" * 60)
         logger.info("SHUTTING DOWN BOT...")
         logger.info("=" * 60)
@@ -293,13 +309,16 @@ class TradingBotOrchestrator:
             
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
+        finally:
+            self.shutdown_in_progress = False
 
 async def main():
     orchestrator = TradingBotOrchestrator()
+    loop = asyncio.get_running_loop()
     
     def signal_handler(sig, frame):
         logger.info(f"Received signal {sig}")
-        asyncio.create_task(orchestrator.shutdown())
+        loop.call_soon_threadsafe(lambda: asyncio.create_task(orchestrator.shutdown()))
     
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
