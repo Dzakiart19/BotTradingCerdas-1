@@ -139,8 +139,15 @@ class TradingStrategy:
                         confidence_reasons.append("Stochastic konfirmasi bearish")
             
             if signal:
-                sl_distance = atr * self.config.SL_ATR_MULTIPLIER
-                tp_distance = sl_distance * self.config.TP_RR_RATIO
+                fixed_risk = self.config.FIXED_RISK_AMOUNT
+                target_profit = fixed_risk * self.config.TP_RR_RATIO
+                min_lot = self.config.LOT_SIZE
+                
+                required_sl_pips = fixed_risk / min_lot
+                required_tp_pips = target_profit / min_lot
+                
+                sl_distance = required_sl_pips / self.config.XAUUSD_PIP_VALUE
+                tp_distance = required_tp_pips / self.config.XAUUSD_PIP_VALUE
                 
                 if signal == 'BUY':
                     stop_loss = close - sl_distance
