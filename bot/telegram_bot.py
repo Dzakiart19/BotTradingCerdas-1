@@ -139,7 +139,7 @@ class TradingBot:
                     candle_count = len(df_m1)
                     logger.info(f"📈 Got {candle_count} candles from market data")
                     
-                    if candle_count >= 3:
+                    if candle_count >= 2:
                         logger.info(f"📊 Analyzing {len(df_m1)} M1 candles for signals...")
                         from bot.indicators import IndicatorEngine
                         indicator_engine = IndicatorEngine(self.config)
@@ -176,7 +176,7 @@ class TradingBot:
                         else:
                             logger.warning("⚠️ Failed to calculate indicators - not enough data")
                     else:
-                        logger.warning(f"❌ Not enough candles: {candle_count}/3 required (TEST MODE)")
+                        logger.warning(f"❌ Not enough candles: {candle_count}/2 required (ULTRA TEST MODE)")
                     
                 except Exception as e:
                     logger.error(f"Error processing tick dalam monitoring loop: {e}")
