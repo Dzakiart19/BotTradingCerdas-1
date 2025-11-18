@@ -54,6 +54,7 @@ class TradingBot:
             "/help - Bantuan lengkap\n"
             "/monitor - Mulai monitoring sinyal trading\n"
             "/stopmonitor - Stop monitoring\n"
+            "/getsignal - Dapatkan sinyal manual sekarang\n"
             "/riwayat - Lihat riwayat trading\n"
             "/performa - Statistik performa\n"
             "/settings - Lihat konfigurasi\n\n"
@@ -350,6 +351,63 @@ class TradingBot:
             logger.error(f"Error calculating performance: {e}")
             await update.message.reply_text("❌ Error menghitung performa.")
     
+    async def getsignal_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.is_authorized(update.effective_user.id):
+            return
+        
+        try:
+            await update.message.reply_text("🔍 Generating manual signal...")
+            
+            current_price = await self.market_data.get_current_price()
+            if not current_price:
+                await update.message.reply_text("❌ Unable to get current price. Please try again.")
+                return
+            
+            session = self.db.get_session()
+            last_trade = session.query(Trade).order_by(Trade.created_at.desc()).first()
+            
+            if last_trade and last_trade.signal_type == 'BUY':
+                signal_type = 'SELL'
+            else:
+                signal_type = 'BUY'
+            
+            session.close()
+            
+            sl_pips = self.config.DEFAULT_SL_PIPS
+            tp_pips = self.config.DEFAULT_TP_PIPS
+            
+            sl_distance = sl_pips / self.config.XAUUSD_PIP_VALUE
+            tp_distance = tp_pips / self.config.XAUUSD_PIP_VALUE
+            
+            if signal_type == 'BUY':
+                stop_loss = current_price - sl_distance
+                take_profit = current_price + tp_distance
+            else:
+                stop_loss = current_price + sl_distance
+                take_profit = current_price - tp_distance
+            
+            signal = {
+                'signal': signal_type,
+                'entry_price': current_price,
+                'stop_loss': stop_loss,
+                'take_profit': take_profit,
+                'timeframe': 'M1',
+                'confidence_reasons': ['Manual signal request', f'Entry: ${current_price:.2f}']
+            }
+            
+            df_m1 = await self.market_data.get_historical_data('M1', 100)
+            
+            await self._send_signal(update.effective_chat.id, signal, df_m1)
+            
+            if self.user_manager:
+                self.user_manager.update_user_activity(update.effective_chat.id)
+                
+            logger.info(f"Manual signal sent: {signal_type} @ ${current_price:.2f}")
+            
+        except Exception as e:
+            logger.error(f"Error generating manual signal: {e}")
+            await update.message.reply_text(f"❌ Error: {str(e)}")
+    
     async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_authorized(update.effective_user.id):
             return
@@ -385,6 +443,7 @@ class TradingBot:
         self.app.add_handler(CommandHandler("help", self.help_command))
         self.app.add_handler(CommandHandler("monitor", self.monitor_command))
         self.app.add_handler(CommandHandler("stopmonitor", self.stopmonitor_command))
+        self.app.add_handler(CommandHandler("getsignal", self.getsignal_command))
         self.app.add_handler(CommandHandler("riwayat", self.riwayat_command))
         self.app.add_handler(CommandHandler("performa", self.performa_command))
         self.app.add_handler(CommandHandler("settings", self.settings_command))

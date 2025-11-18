@@ -7,16 +7,16 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
     AUTHORIZED_USER_IDS = [int(uid.strip()) for uid in os.getenv('AUTHORIZED_USER_IDS', '').split(',') if uid.strip()]
     
-    EMA_PERIODS = [int(p.strip()) for p in os.getenv('EMA_PERIODS', '3,5,8').split(',')]
-    RSI_PERIOD = int(os.getenv('RSI_PERIOD', '6'))
+    EMA_PERIODS = [int(p.strip()) for p in os.getenv('EMA_PERIODS', '2,3,4').split(',')]
+    RSI_PERIOD = int(os.getenv('RSI_PERIOD', '3'))
     RSI_OVERSOLD_LEVEL = int(os.getenv('RSI_OVERSOLD_LEVEL', '30'))
     RSI_OVERBOUGHT_LEVEL = int(os.getenv('RSI_OVERBOUGHT_LEVEL', '70'))
-    STOCH_K_PERIOD = int(os.getenv('STOCH_K_PERIOD', '5'))
-    STOCH_D_PERIOD = int(os.getenv('STOCH_D_PERIOD', '3'))
-    STOCH_SMOOTH_K = int(os.getenv('STOCH_SMOOTH_K', '3'))
+    STOCH_K_PERIOD = int(os.getenv('STOCH_K_PERIOD', '3'))
+    STOCH_D_PERIOD = int(os.getenv('STOCH_D_PERIOD', '2'))
+    STOCH_SMOOTH_K = int(os.getenv('STOCH_SMOOTH_K', '2'))
     STOCH_OVERSOLD_LEVEL = int(os.getenv('STOCH_OVERSOLD_LEVEL', '20'))
     STOCH_OVERBOUGHT_LEVEL = int(os.getenv('STOCH_OVERBOUGHT_LEVEL', '80'))
-    ATR_PERIOD = int(os.getenv('ATR_PERIOD', '8'))
+    ATR_PERIOD = int(os.getenv('ATR_PERIOD', '4'))
     VOLUME_THRESHOLD_MULTIPLIER = float(os.getenv('VOLUME_THRESHOLD_MULTIPLIER', '0.5'))
     MAX_SPREAD_PIPS = float(os.getenv('MAX_SPREAD_PIPS', '10.0'))
     
