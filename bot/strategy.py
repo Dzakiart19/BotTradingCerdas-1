@@ -37,36 +37,26 @@ class TradingStrategy:
             ema_aligned_bullish = (ema_short is not None and ema_long is not None and ema_short > ema_long)
             ema_aligned_bearish = (ema_short is not None and ema_long is not None and ema_short < ema_long)
             
-            rsi_bullish_signal = (rsi is not None and rsi < 50)
-            rsi_bearish_signal = (rsi is not None and rsi > 50)
+            rsi_bullish_signal = True
+            rsi_bearish_signal = True
             
             stoch_bullish_signal = (stoch_k is not None and stoch_d is not None and stoch_k > stoch_d)
             stoch_bearish_signal = (stoch_k is not None and stoch_d is not None and stoch_k < stoch_d)
             
-            high_volume = volume > (volume_avg * self.config.VOLUME_THRESHOLD_MULTIPLIER)
+            high_volume = True
             
             signal = None
             confidence_reasons = []
             
-            if ema_aligned_bullish and (rsi_bullish_signal or stoch_bullish_signal):
+            if ema_aligned_bullish:
                 signal = 'BUY'
-                confidence_reasons.append("EMA trend bullish")
-                if rsi_bullish_signal:
-                    confidence_reasons.append("RSI bullish zone")
-                if stoch_bullish_signal:
-                    confidence_reasons.append("Stochastic bullish")
-                if high_volume:
-                    confidence_reasons.append("High volume")
+                confidence_reasons.append("EMA trend bullish (TEST MODE)")
+                confidence_reasons.append("Quick test signal")
                     
-            elif ema_aligned_bearish and (rsi_bearish_signal or stoch_bearish_signal):
+            elif ema_aligned_bearish:
                 signal = 'SELL'
-                confidence_reasons.append("EMA trend bearish")
-                if rsi_bearish_signal:
-                    confidence_reasons.append("RSI bearish zone")
-                if stoch_bearish_signal:
-                    confidence_reasons.append("Stochastic bearish")
-                if high_volume:
-                    confidence_reasons.append("High volume")
+                confidence_reasons.append("EMA trend bearish (TEST MODE)")
+                confidence_reasons.append("Quick test signal")
             
             if signal:
                 sl_distance = atr * self.config.SL_ATR_MULTIPLIER
