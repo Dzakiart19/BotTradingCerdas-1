@@ -27,6 +27,7 @@ class TradingBot:
         self.app = None
         self.monitoring = False
         self.monitoring_chats = []
+        self.signal_lock = asyncio.Lock()
         
     def is_authorized(self, user_id: int) -> bool:
         if self.user_manager:
@@ -227,8 +228,9 @@ class TradingBot:
                                     is_valid, validation_msg = self.strategy.validate_signal(signal, spread)
                                     
                                     if is_valid:
-                                        for monitoring_chat_id in self.monitoring_chats:
-                                            await self._send_signal(monitoring_chat_id, signal, df_m1)
+                                        async with self.signal_lock:
+                                            for monitoring_chat_id in self.monitoring_chats:
+                                                await self._send_signal(monitoring_chat_id, signal, df_m1)
                                         
                                         self.risk_manager.record_signal()
                                         last_signal_check = now
@@ -411,80 +413,74 @@ class TradingBot:
             return
         
         try:
-            if self.position_tracker.has_active_position():
+            if self.position_tracker and len(self.position_tracker.active_positions) > 0:
                 await update.message.reply_text(
-                    "⏳ *Tidak Bisa Kirim Sinyal Baru*\n\n"
-                    "Ada posisi aktif yang sedang berjalan. "
-                    "Tunggu sampai TP atau SL tercapai terlebih dahulu.\n\n"
-                    "Gunakan /riwayat untuk melihat posisi aktif.",
+                    "⏳ *Tidak Dapat Membuat Sinyal Baru*\n\n"
+                    "Saat ini ada posisi aktif yang sedang berjalan.\n"
+                    "Bot akan tracking hingga TP/SL tercapai.\n\n"
+                    "Tunggu hasil posisi saat ini sebelum request sinyal baru.",
                     parse_mode='Markdown'
                 )
                 return
             
-            await update.message.reply_text("🔍 Generating manual signal...")
-            
-            current_price = await self.market_data.get_current_price()
-            if not current_price:
-                await update.message.reply_text("❌ Unable to get current price. Please try again.")
-                return
-            
-            session = self.db.get_session()
-            last_trade = session.query(Trade).order_by(Trade.signal_time.desc()).first()
-            
-            if last_trade and last_trade.signal_type == 'BUY':
-                signal_type = 'SELL'
-            else:
-                signal_type = 'BUY'
-            
-            session.close()
-            
-            sl_pips = self.config.DEFAULT_SL_PIPS
-            tp_pips = self.config.DEFAULT_TP_PIPS
-            
-            sl_distance = sl_pips / self.config.XAUUSD_PIP_VALUE
-            tp_distance = tp_pips / self.config.XAUUSD_PIP_VALUE
-            
-            if signal_type == 'BUY':
-                stop_loss = current_price - sl_distance
-                take_profit = current_price + tp_distance
-            else:
-                stop_loss = current_price + sl_distance
-                take_profit = current_price - tp_distance
-            
-            signal = {
-                'signal': signal_type,
-                'entry_price': current_price,
-                'stop_loss': stop_loss,
-                'take_profit': take_profit,
-                'timeframe': 'M1',
-                'confidence_reasons': ['Manual signal request', f'Entry: ${current_price:.2f}']
-            }
+            await update.message.reply_text("🔍 Menganalisis chart untuk sinyal manual...")
             
             df_m1 = await self.market_data.get_historical_data('M1', 100)
             
             if df_m1 is None or len(df_m1) < 30:
-                logger.info("Not enough local candles for chart, waiting for more data...")
-                await update.message.reply_text("⏳ Menunggu data candle terbentuk (minimal 30 candle)...")
-                
-                for i in range(60):
-                    await asyncio.sleep(1)
-                    df_m1 = await self.market_data.get_historical_data('M1', 100)
-                    if df_m1 is not None and len(df_m1) >= 30:
-                        logger.info(f"Got {len(df_m1)} candles after waiting {i+1}s")
-                        break
-                
-                if df_m1 is None or len(df_m1) < 30:
-                    logger.warning(f"Still not enough candles after 60s wait: {len(df_m1) if df_m1 is not None else 0}")
+                await update.message.reply_text(
+                    f"❌ Tidak cukup data candles!\n"
+                    f"Tersedia: {len(df_m1) if df_m1 is not None else 0} candles\n"
+                    f"Dibutuhkan: 30 candles minimum\n\n"
+                    "Tunggu beberapa menit lagi untuk bot build candles."
+                )
+                return
             
-            await self._send_signal(update.effective_chat.id, signal, df_m1)
+            from bot.indicators import IndicatorEngine
+            indicator_engine = IndicatorEngine(self.config)
+            indicators = indicator_engine.get_indicators(df_m1)
             
-            if self.user_manager:
-                self.user_manager.update_user_activity(update.effective_chat.id)
-                
-            logger.info(f"Manual signal sent: {signal_type} @ ${current_price:.2f}")
+            if not indicators:
+                await update.message.reply_text("❌ Gagal menghitung indikator. Coba lagi.")
+                return
+            
+            signal = self.strategy.detect_signal(indicators, 'M1')
+            
+            if not signal:
+                await update.message.reply_text(
+                    "❌ *Tidak Ada Sinyal Saat Ini*\n\n"
+                    "Kondisi market tidak memenuhi kriteria strategi.\n"
+                    "Silakan coba lagi nanti atau gunakan /monitor untuk deteksi otomatis.",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            current_price = await self.market_data.get_current_price()
+            spread_value = await self.market_data.get_spread()
+            spread = spread_value if spread_value else 0.5
+            
+            is_valid, validation_msg = self.strategy.validate_signal(signal, spread)
+            
+            if not is_valid:
+                await update.message.reply_text(
+                    f"⚠️ *Sinyal Tidak Valid*\n\n"
+                    f"Alasan: {validation_msg}\n\n"
+                    f"Signal: {signal['signal']}\n"
+                    f"Entry: ${signal['entry_price']:.2f}\n"
+                    f"SL: ${signal['stop_loss']:.2f}\n"
+                    f"TP: ${signal['take_profit']:.2f}",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            chat_id = update.effective_chat.id
+            async with self.signal_lock:
+                await self._send_signal(chat_id, signal, df_m1)
+            
+            logger.info(f"Manual signal sent to chat {chat_id}: {signal['signal']}")
             
         except Exception as e:
-            logger.error(f"Error generating manual signal: {e}")
+            logger.error(f"Error in getsignal_command: {e}")
             await update.message.reply_text(f"❌ Error: {str(e)}")
     
     async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -594,9 +590,14 @@ class TradingBot:
             await update.message.reply_text(f"❌ Error: {str(e)}")
     
     async def addpremium_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logger.info(f"/addpremium called by user {update.effective_user.id}")
+        
         if not self.is_admin(update.effective_user.id):
+            logger.warning(f"Non-admin user {update.effective_user.id} tried to use /addpremium")
             await update.message.reply_text("⛔ Command ini hanya untuk admin.")
             return
+        
+        logger.info(f"Admin verified, args: {context.args}")
         
         if not context.args or len(context.args) < 2:
             await update.message.reply_text(

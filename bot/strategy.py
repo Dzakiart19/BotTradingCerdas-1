@@ -73,20 +73,20 @@ class TradingStrategy:
                 
                 return {
                     'signal': signal,
-                    'entry_price': close,
-                    'stop_loss': stop_loss,
-                    'take_profit': take_profit,
+                    'entry_price': float(close),
+                    'stop_loss': float(stop_loss),
+                    'take_profit': float(take_profit),
                     'timeframe': timeframe,
                     'indicators': json.dumps({
-                        'ema_short': ema_short,
-                        'ema_mid': ema_mid,
-                        'ema_long': ema_long,
-                        'rsi': rsi,
-                        'stoch_k': stoch_k,
-                        'stoch_d': stoch_d,
-                        'atr': atr,
-                        'volume': volume,
-                        'volume_avg': volume_avg
+                        'ema_short': float(ema_short) if ema_short is not None else None,
+                        'ema_mid': float(ema_mid) if ema_mid is not None else None,
+                        'ema_long': float(ema_long) if ema_long is not None else None,
+                        'rsi': float(rsi) if rsi is not None else None,
+                        'stoch_k': float(stoch_k) if stoch_k is not None else None,
+                        'stoch_d': float(stoch_d) if stoch_d is not None else None,
+                        'atr': float(atr) if atr is not None else None,
+                        'volume': int(volume) if volume is not None else None,
+                        'volume_avg': float(volume_avg) if volume_avg is not None else None
                     }),
                     'confidence_reasons': confidence_reasons
                 }

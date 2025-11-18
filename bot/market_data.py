@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timedelta
 from collections import deque
 import pandas as pd
+import pytz
 import random
 from typing import Optional, Dict, List
 from bot.logger import setup_logger
@@ -20,6 +21,9 @@ class OHLCBuilder:
         
     def add_tick(self, bid: float, ask: float, timestamp: datetime):
         mid_price = (bid + ask) / 2.0
+        
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=pytz.UTC)
         
         candle_start = timestamp.replace(
             second=0, 
@@ -57,7 +61,9 @@ class OHLCBuilder:
             return None
         
         df = pd.DataFrame(all_candles)
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
         df.set_index('timestamp', inplace=True)
+        df.index = pd.DatetimeIndex(df.index)
         
         if len(df) > limit:
             df = df.tail(limit)
@@ -114,6 +120,62 @@ class MarketDataClient:
                 logger.warning(f"Queue full untuk subscriber '{name}', skipping tick")
             except Exception as e:
                 logger.error(f"Error broadcasting tick ke '{name}': {e}")
+    
+    async def fetch_historical_candles(self, websocket, timeframe_minutes: int = 1, count: int = 100):
+        """Fetch historical candles from Deriv API to pre-populate OHLC data"""
+        try:
+            granularity = timeframe_minutes * 60
+            
+            history_request = {
+                "ticks_history": self.symbol,
+                "adjust_start_time": 1,
+                "count": count,
+                "end": "latest",
+                "start": 1,
+                "style": "candles",
+                "granularity": granularity
+            }
+            
+            await websocket.send(json.dumps(history_request))
+            logger.info(f"📥 Requesting {count} historical M{timeframe_minutes} candles...")
+            
+            response = await websocket.recv()
+            data = json.loads(response)
+            
+            if 'candles' in data:
+                candles = data['candles']
+                logger.info(f"✅ Received {len(candles)} historical candles from Deriv API")
+                
+                builder = self.m1_builder if timeframe_minutes == 1 else self.m5_builder
+                
+                for candle in candles:
+                    timestamp = datetime.fromtimestamp(candle['epoch'], tz=pytz.UTC)
+                    timestamp = timestamp.replace(second=0, microsecond=0)
+                    
+                    open_price = float(candle['open'])
+                    high_price = float(candle['high'])
+                    low_price = float(candle['low'])
+                    close_price = float(candle['close'])
+                    
+                    candle_data = {
+                        'timestamp': pd.Timestamp(timestamp),
+                        'open': open_price,
+                        'high': high_price,
+                        'low': low_price,
+                        'close': close_price,
+                        'volume': 100
+                    }
+                    builder.candles.append(candle_data)
+                
+                logger.info(f"🚀 Pre-populated {len(builder.candles)} M{timeframe_minutes} candles - ready!")
+                return True
+            else:
+                logger.warning(f"No historical candles in response: {data}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error fetching historical candles: {e}")
+            return False
         
     async def connect_websocket(self):
         self.running = True
@@ -131,6 +193,9 @@ class MarketDataClient:
                     self.reconnect_attempts = 0
                     
                     logger.info(f"✅ Connected to Deriv WebSocket")
+                    
+                    await self.fetch_historical_candles(websocket, timeframe_minutes=1, count=100)
+                    await self.fetch_historical_candles(websocket, timeframe_minutes=5, count=100)
                     
                     subscribe_msg = {"ticks": self.symbol}
                     await websocket.send(json.dumps(subscribe_msg))

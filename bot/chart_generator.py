@@ -38,9 +38,9 @@ class ChartGenerator:
             from bot.indicators import IndicatorEngine
             indicator_engine = IndicatorEngine(self.config)
             
-            ema_5 = df_copy['close'].ewm(span=self.config.EMA_PERIODS[0], adjust=False).mean()
-            ema_10 = df_copy['close'].ewm(span=self.config.EMA_PERIODS[1], adjust=False).mean()
-            ema_20 = df_copy['close'].ewm(span=self.config.EMA_PERIODS[2], adjust=False).mean()
+            ema_5 = df_copy['close'].ewm(span=self.config.EMA_PERIODS[0], adjust=False).mean().bfill().ffill()
+            ema_10 = df_copy['close'].ewm(span=self.config.EMA_PERIODS[1], adjust=False).mean().bfill().ffill()
+            ema_20 = df_copy['close'].ewm(span=self.config.EMA_PERIODS[2], adjust=False).mean().bfill().ffill()
             
             addplot.append(mpf.make_addplot(ema_5, color='blue', width=1.5, panel=0, label=f'EMA {self.config.EMA_PERIODS[0]}'))
             addplot.append(mpf.make_addplot(ema_10, color='orange', width=1.5, panel=0, label=f'EMA {self.config.EMA_PERIODS[1]}'))
@@ -51,6 +51,7 @@ class ChartGenerator:
             loss = (-delta.where(delta < 0, 0)).rolling(window=self.config.RSI_PERIOD).mean()
             rs = gain / loss
             rsi = 100 - (100 / (1 + rs))
+            rsi = rsi.fillna(50)
             
             addplot.append(mpf.make_addplot(rsi, color='purple', width=1.5, panel=1, ylabel='RSI', ylim=(0, 100)))
             
@@ -64,6 +65,8 @@ class ChartGenerator:
             stoch_k = 100 * (df_copy['close'] - low_min) / (high_max - low_min)
             stoch_k = stoch_k.rolling(window=self.config.STOCH_SMOOTH_K).mean()
             stoch_d = stoch_k.rolling(window=self.config.STOCH_D_PERIOD).mean()
+            stoch_k = stoch_k.fillna(50)
+            stoch_d = stoch_d.fillna(50)
             
             addplot.append(mpf.make_addplot(stoch_k, color='blue', width=1.5, panel=2, ylabel='Stochastic', ylim=(0, 100)))
             addplot.append(mpf.make_addplot(stoch_d, color='orange', width=1.5, panel=2))
@@ -83,7 +86,8 @@ class ChartGenerator:
                     marker_color = 'lime' if signal_type == 'BUY' else 'red'
                     marker_symbol = '^' if signal_type == 'BUY' else 'v'
                     
-                    marker_series = pd.Series(index=df_copy.index, data=[None] * len(df_copy))
+                    import numpy as np
+                    marker_series = pd.Series(index=df_copy.index, data=[np.nan] * len(df_copy))
                     marker_series.iloc[-1] = entry_price
                     
                     addplot.append(
@@ -145,7 +149,7 @@ class ChartGenerator:
                 savefig=filepath,
                 figsize=(14, 12),
                 returnfig=True,
-                panel_ratios=(3, 1, 1, 1)
+                panel_ratios=(3, 1, 1)
             )
             
             logger.info(f"Chart generated: {filepath}")

@@ -12,8 +12,40 @@ Bot trading XAUUSD otomatis dengan fitur lengkap versi 2:
 - ✅ **[V2]** Chart dengan indikator EMA, RSI, dan Stochastic (tidak polos)
 - ✅ **[V2]** Admin commands untuk manajemen user premium
 - ✅ **[V2]** Kontrol akses berbasis langganan
+- ✅ **[V2.2]** Chart generation dengan indikator lengkap berhasil!
+- ✅ **[V2.2]** Double protection anti-duplicate signals
 
 ## Perubahan Terbaru (18 November 2025 - Latest)
+
+### 🎉 VERSION 2.2 - Chart Generation Fix & Anti-Duplicate (18 Nov 2025 - Latest)
+
+**Bug Fixes & Improvements:**
+
+1. **Chart Generation Berhasil:**
+   - Fixed numpy type conversion (int64/float64 → native Python types)
+   - Fixed timezone consistency (historical candles & live ticks semua UTC tz-aware)
+   - Fixed DataFrame DatetimeIndex untuk mplfinance compatibility
+   - Fixed panel_ratios untuk 3 panels (main+volume, RSI, Stochastic)
+   - Fixed marker_series menggunakan np.nan instead of None
+   - Fixed EMA/RSI/Stochastic fillna untuk prevent NaN values
+   
+2. **Anti-Duplicate Protection:**
+   - Added active position check di `/getsignal` command
+   - Added asyncio.Lock() untuk serialize signal sending
+   - Prevent overlapping positions dari automatic monitoring dan manual command
+   - Ensure only ONE signal dapat processed at a time
+   
+3. **Position Tracking:**
+   - Bot tracking posisi real-time hingga TP/SL tercapai
+   - Automatic monitoring loop check active positions before send new signal
+   - Manual `/getsignal` command juga check active positions
+   - User mendapat pesan jelas jika ada posisi aktif sedang berjalan
+
+**Status Saat Ini:**
+- ✅ Chart generation 100% working dengan indikator lengkap
+- ✅ No duplicate signals/positions
+- ✅ Position tracking hingga TP/SL
+- ✅ Bot siap untuk production use!
 
 ### 🎉 VERSION 2.1 - Auto Monitoring & Chart Exit (18 Nov 2025 - Latest)
 
