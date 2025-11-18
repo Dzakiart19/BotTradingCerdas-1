@@ -63,7 +63,44 @@ The bot's architecture is modular, designed for scalability and maintainability.
 -   **Database:** SQLite for lightweight, embedded data storage with auto-migration support.
 -   **Deployment:** Designed for Koyeb and Replit, with Dockerfile using Debian Trixie compatible libraries (`libgl1` instead of `libgl1-mesa-glx`).
 
-## Recent Changes (V2.5 - Multi-User Support System)
+## Recent Changes (V2.6 - Webhook & Deployment Enhancements)
+**Date:** November 18, 2025 (Latest)
+
+**Major Enhancement: Production-Ready Webhook Support for Replit Deployment**
+1. **Webhook Configuration Validation (config.py):**
+   - Added comprehensive validation for `TELEGRAM_WEBHOOK_MODE` and `WEBHOOK_URL`
+   - Informative warnings guide users to set proper environment variables
+   - Clear error messages for misconfiguration scenarios
+   - Prevents silent failures in production deployment
+
+2. **Intelligent Webhook URL Auto-Detection (main.py):**
+   - Robust parsing of Replit's `REPLIT_DOMAINS` environment variable (JSON array format)
+   - Graceful fallback to `REPLIT_DEV_DOMAIN` if primary detection fails
+   - Multiple validation layers: JSON parsing, string sanitization, URL structure validation using `urllib.parse`
+   - Rejects malformed domains (quotes, brackets, protocol prefixes)
+   - Auto-constructs `https://{domain}/webhook` for seamless deployment
+   - Comprehensive logging for debugging deployment issues
+
+3. **Enhanced Webhook Error Handling (bot/telegram_bot.py):**
+   - Retry logic with exponential backoff (max 3 attempts) for webhook registration failures
+   - Flexible webhook update processing: accepts `telegram.Update` objects, JSON strings, dicts, objects with `to_dict()` method, and any dict-like mappings
+   - Graceful handling of framework-specific payload formats
+   - Detailed error logging with traceback for production debugging
+   - Prevents webhook update drops due to format incompatibility
+
+4. **Balanced Signal Detection Strategy (bot/strategy.py):**
+   - Changed from strict AND logic to flexible scoring system (minimum score 4 out of ~7 required)
+   - **100% Symmetric BUY/SELL Scoring:** Both directions use identical conditions
+     - EMA trend: +2 points
+     - MACD crossover: +2 points, OR MACD continuation: +1 point (mutually exclusive via `elif`)
+     - RSI bullish/bearish: +1 point
+     - RSI crossover: +1 point
+     - Stochastic confirmation: +1 point
+     - Volume bonus: +1 point (awarded to leading direction only)
+   - Eliminates previous SELL bias while maintaining precision
+   - More balanced signal generation for both market directions
+
+**V2.5 Changes (Multi-User Support System):**
 **Date:** November 18, 2025
 
 **Major Enhancement: Per-User Position Tracking & Risk Management**
