@@ -191,7 +191,7 @@ class PositionTracker:
                             'timeframe': 'M1'
                         }
                         
-                        chart_path = self.chart_generator.generate_chart(df_m1, exit_signal, 'M1')
+                        chart_path = await self.chart_generator.generate_chart_async(df_m1, exit_signal, 'M1')
                         
                         result_emoji = '✅' if trade.result == 'WIN' else '❌'
                         exit_label = "TRADE_EXIT" if reason == "TP_HIT" else "Trade LOSS"

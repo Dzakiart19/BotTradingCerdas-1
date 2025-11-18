@@ -96,30 +96,70 @@ class MarketDataClient:
         self.price_volatility = 2.0
         
         self.subscribers = {}
+        self.subscriber_failures = {}
+        self.max_consecutive_failures = 5
         logger.info("Pub/Sub mechanism initialized")
     
     async def subscribe_ticks(self, name: str) -> asyncio.Queue:
         queue = asyncio.Queue(maxsize=100)
         self.subscribers[name] = queue
+        self.subscriber_failures[name] = 0
         logger.debug(f"Subscriber '{name}' registered untuk tick feed")
         return queue
     
     async def unsubscribe_ticks(self, name: str):
         if name in self.subscribers:
             del self.subscribers[name]
+            if name in self.subscriber_failures:
+                del self.subscriber_failures[name]
             logger.debug(f"Subscriber '{name}' unregistered dari tick feed")
     
     async def _broadcast_tick(self, tick_data: Dict):
         if not self.subscribers:
             return
         
+        stale_subscribers = []
+        
         for name, queue in list(self.subscribers.items()):
-            try:
-                queue.put_nowait(tick_data)
-            except asyncio.QueueFull:
-                logger.warning(f"Queue full untuk subscriber '{name}', skipping tick")
-            except Exception as e:
-                logger.error(f"Error broadcasting tick ke '{name}': {e}")
+            success = False
+            max_retries = 3
+            
+            for attempt in range(max_retries):
+                try:
+                    queue.put_nowait(tick_data)
+                    success = True
+                    if name in self.subscriber_failures:
+                        self.subscriber_failures[name] = 0
+                    break
+                    
+                except asyncio.QueueFull:
+                    if attempt < max_retries - 1:
+                        backoff_time = 0.1 * (2 ** attempt)
+                        logger.debug(f"Queue full for '{name}', retry {attempt + 1}/{max_retries} after {backoff_time}s")
+                        await asyncio.sleep(backoff_time)
+                    else:
+                        logger.warning(f"Queue full for subscriber '{name}' after {max_retries} retries, skipping tick")
+                        
+                except Exception as e:
+                    logger.error(f"Error broadcasting tick to '{name}': {e}")
+                    break
+            
+            if not success:
+                if name in self.subscriber_failures:
+                    self.subscriber_failures[name] += 1
+                else:
+                    self.subscriber_failures[name] = 1
+                
+                if self.subscriber_failures[name] >= self.max_consecutive_failures:
+                    logger.warning(f"Subscriber '{name}' failed {self.subscriber_failures[name]} times consecutively, marking for removal")
+                    stale_subscribers.append(name)
+        
+        for name in stale_subscribers:
+            if name in self.subscribers:
+                del self.subscribers[name]
+            if name in self.subscriber_failures:
+                del self.subscriber_failures[name]
+            logger.info(f"Removed stale subscriber '{name}' due to consecutive failures")
     
     async def fetch_historical_candles(self, websocket, timeframe_minutes: int = 1, count: int = 100):
         """Fetch historical candles from Deriv API to pre-populate OHLC data"""

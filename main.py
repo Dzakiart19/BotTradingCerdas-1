@@ -4,9 +4,10 @@ import sys
 import os
 from aiohttp import web
 from typing import Optional
+from sqlalchemy import text
 
 from config import Config
-from bot.logger import setup_logger
+from bot.logger import setup_logger, mask_token, sanitize_log_message
 from bot.database import DatabaseManager
 from bot.market_data import MarketDataClient
 from bot.strategy import TradingStrategy
@@ -98,17 +99,54 @@ class TradingBotOrchestrator:
             async def health_check(request):
                 market_status = self.market_data.get_status()
                 
+                db_status = 'unknown'
+                try:
+                    session = self.db_manager.get_session()
+                    result = session.execute(text('SELECT 1'))
+                    result.fetchone()
+                    session.close()
+                    db_status = 'connected'
+                except Exception as e:
+                    db_status = f'error: {str(e)[:50]}'
+                    logger.error(f"Database health check failed: {e}")
+                
                 health_status = {
                     'status': 'healthy' if self.running else 'stopped',
                     'market_data': market_status,
                     'telegram_bot': 'running' if self.telegram_bot.app else 'stopped',
-                    'scheduler': 'running' if self.task_scheduler.running else 'stopped'
+                    'scheduler': 'running' if self.task_scheduler.running else 'stopped',
+                    'database': db_status,
+                    'webhook_mode': self.config.TELEGRAM_WEBHOOK_MODE
                 }
                 
                 return web.json_response(health_status)
             
+            async def telegram_webhook(request):
+                if not self.config.TELEGRAM_WEBHOOK_MODE:
+                    logger.warning("Webhook endpoint called but webhook mode is disabled")
+                    return web.json_response({'error': 'Webhook mode is disabled'}, status=400)
+                
+                if not self.telegram_bot or not self.telegram_bot.app:
+                    logger.error("Webhook called but telegram bot not initialized")
+                    return web.json_response({'error': 'Bot not initialized'}, status=503)
+                
+                try:
+                    update_data = await request.json()
+                    logger.debug(f"Received webhook update: {update_data.get('update_id', 'unknown')}")
+                    
+                    await self.telegram_bot.process_update(update_data)
+                    
+                    return web.json_response({'ok': True})
+                    
+                except Exception as e:
+                    logger.error(f"Error processing webhook request: {e}")
+                    if self.error_handler:
+                        self.error_handler.log_exception(e, "webhook_endpoint")
+                    return web.json_response({'error': str(e)}, status=500)
+            
             app = web.Application()
             app.router.add_get('/health', health_check)
+            app.router.add_post('/webhook', telegram_webhook)
             
             runner = web.AppRunner(app)
             await runner.setup()
@@ -118,6 +156,8 @@ class TradingBotOrchestrator:
             
             self.health_server = runner
             logger.info(f"Health check server started on port {self.config.HEALTH_CHECK_PORT}")
+            if self.config.TELEGRAM_WEBHOOK_MODE:
+                logger.info(f"Webhook endpoint available at: http://0.0.0.0:{self.config.HEALTH_CHECK_PORT}/webhook")
             
         except Exception as e:
             logger.error(f"Failed to start health server: {e}")
@@ -138,7 +178,15 @@ class TradingBotOrchestrator:
         logger.info("XAUUSD TRADING BOT STARTING")
         logger.info("=" * 60)
         logger.info(f"Mode: {'DRY RUN (Simulation)' if self.config.DRY_RUN else 'LIVE'}")
-        logger.info(f"Telegram Bot Token: {'Configured' if self.config.TELEGRAM_BOT_TOKEN else 'NOT CONFIGURED'}")
+        
+        if self.config.TELEGRAM_BOT_TOKEN:
+            logger.info(f"Telegram Bot Token: Configured ({self.config.get_masked_token()})")
+            
+            if ':' in self.config.TELEGRAM_BOT_TOKEN and len(self.config.TELEGRAM_BOT_TOKEN) > 40:
+                logger.warning("⚠️ Bot token detected - ensure it's never logged in plain text")
+        else:
+            logger.info("Telegram Bot Token: NOT CONFIGURED")
+        
         logger.info(f"Authorized Users: {len(self.config.AUTHORIZED_USER_IDS)}")
         logger.info("=" * 60)
         
@@ -264,44 +312,84 @@ class TradingBotOrchestrator:
         logger.info("=" * 60)
         
         self.running = False
+        shutdown_timeout = 10
         
         try:
             if self.telegram_bot and self.telegram_bot.app and self.config.AUTHORIZED_USER_IDS:
-                shutdown_msg = "🛑 *Bot Shutting Down*\n\nBot is being stopped."
-                
-                for user_id in self.config.AUTHORIZED_USER_IDS:
-                    try:
-                        await self.telegram_bot.app.bot.send_message(
-                            chat_id=user_id,
-                            text=shutdown_msg,
-                            parse_mode='Markdown'
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to send shutdown message: {e}")
+                try:
+                    shutdown_msg = "🛑 *Bot Shutting Down*\n\nBot is being stopped."
+                    
+                    async def send_shutdown_messages():
+                        for user_id in self.config.AUTHORIZED_USER_IDS:
+                            try:
+                                await self.telegram_bot.app.bot.send_message(
+                                    chat_id=user_id,
+                                    text=shutdown_msg,
+                                    parse_mode='Markdown'
+                                )
+                            except Exception as e:
+                                logger.error(f"Failed to send shutdown message: {e}")
+                    
+                    await asyncio.wait_for(send_shutdown_messages(), timeout=shutdown_timeout)
+                except asyncio.TimeoutError:
+                    logger.warning(f"Sending shutdown messages timed out after {shutdown_timeout}s")
+                except Exception as e:
+                    logger.error(f"Error sending shutdown messages: {e}")
             
             logger.info("Stopping Telegram bot...")
             if self.telegram_bot:
-                await self.telegram_bot.stop()
+                try:
+                    await asyncio.wait_for(self.telegram_bot.stop(), timeout=shutdown_timeout)
+                except asyncio.TimeoutError:
+                    logger.warning(f"Telegram bot shutdown timed out after {shutdown_timeout}s")
+                except Exception as e:
+                    logger.error(f"Error stopping Telegram bot: {e}")
             
             logger.info("Stopping position tracker...")
             if self.position_tracker:
-                self.position_tracker.stop_monitoring()
+                try:
+                    self.position_tracker.stop_monitoring()
+                except Exception as e:
+                    logger.error(f"Error stopping position tracker: {e}")
             
             logger.info("Stopping task scheduler...")
             if self.task_scheduler:
-                await self.task_scheduler.stop()
+                try:
+                    await asyncio.wait_for(self.task_scheduler.stop(), timeout=shutdown_timeout)
+                except asyncio.TimeoutError:
+                    logger.warning(f"Task scheduler shutdown timed out after {shutdown_timeout}s")
+                except Exception as e:
+                    logger.error(f"Error stopping task scheduler: {e}")
+            
+            logger.info("Stopping chart generator...")
+            if self.chart_generator:
+                try:
+                    self.chart_generator.shutdown()
+                except Exception as e:
+                    logger.error(f"Error shutting down chart generator: {e}")
             
             logger.info("Stopping market data connection...")
             if self.market_data:
-                self.market_data.disconnect()
+                try:
+                    self.market_data.disconnect()
+                except Exception as e:
+                    logger.error(f"Error disconnecting market data: {e}")
             
             logger.info("Closing database connections...")
             if self.db_manager:
-                self.db_manager.close()
+                try:
+                    self.db_manager.close()
+                except Exception as e:
+                    logger.error(f"Error closing database: {e}")
             
             logger.info("Stopping health server...")
             if self.health_server:
-                await self.health_server.cleanup()
+                try:
+                    await asyncio.wait_for(self.health_server.cleanup(), timeout=shutdown_timeout)
+                except asyncio.TimeoutError:
+                    logger.warning(f"Health server shutdown timed out after {shutdown_timeout}s")
+                except Exception as e:
+                    logger.error(f"Error stopping health server: {e}")
             
             logger.info("=" * 60)
             logger.info("BOT SHUTDOWN COMPLETE")

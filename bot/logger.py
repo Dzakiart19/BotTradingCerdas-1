@@ -1,7 +1,54 @@
 import logging
 import os
+import re
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
+
+def mask_token(token: str) -> str:
+    if not token or not isinstance(token, str):
+        return "****"
+    
+    token = token.strip()
+    if len(token) <= 8:
+        return "****"
+    
+    return f"{token[:4]}...{token[-4:]}"
+
+def mask_user_id(user_id: int) -> str:
+    if not user_id:
+        return "***"
+    
+    user_id_str = str(user_id)
+    if len(user_id_str) <= 6:
+        return f"{user_id_str[:2]}***{user_id_str[-1:]}"
+    
+    mid_len = len(user_id_str) - 6
+    return f"{user_id_str[:3]}{'*' * min(mid_len, 3)}{user_id_str[-3:]}"
+
+def sanitize_log_message(message: str) -> str:
+    if not message or not isinstance(message, str):
+        return message
+    
+    sanitized = message
+    
+    bot_token_pattern = r'\b\d{8,}:[A-Za-z0-9_-]{35,}\b'
+    matches = re.findall(bot_token_pattern, sanitized)
+    for token in matches:
+        sanitized = sanitized.replace(token, mask_token(token))
+    
+    api_key_patterns = [
+        r'\b[A-Za-z0-9]{32,}\b',
+        r'\bsk-[A-Za-z0-9]{32,}\b',
+        r'\bapi[_-]?key[_-]?[A-Za-z0-9]{20,}\b'
+    ]
+    
+    for pattern in api_key_patterns:
+        matches = re.findall(pattern, sanitized, re.IGNORECASE)
+        for key in matches:
+            if len(key) >= 20 and not key.isdigit():
+                sanitized = sanitized.replace(key, mask_token(key))
+    
+    return sanitized
 
 def setup_logger(name='TradingBot', log_dir='logs', level=None):
     os.makedirs(log_dir, exist_ok=True)

@@ -57,8 +57,15 @@ def _parse_int_list(env_value: str, default_list: list) -> list:
 
 class Config:
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
+    TELEGRAM_WEBHOOK_MODE = os.getenv('TELEGRAM_WEBHOOK_MODE', 'false').lower() == 'true'
+    WEBHOOK_URL = os.getenv('WEBHOOK_URL', '')
     AUTHORIZED_USER_IDS = _parse_user_ids(os.getenv('AUTHORIZED_USER_IDS', ''))
     EMA_PERIODS = _parse_int_list(os.getenv('EMA_PERIODS', '5,10,20'), [5, 10, 20])
+    
+    @classmethod
+    def get_masked_token(cls) -> str:
+        from bot.logger import mask_token
+        return mask_token(cls.TELEGRAM_BOT_TOKEN)
     
     @classmethod
     def validate(cls):

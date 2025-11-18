@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytz
 import pandas as pd
 from typing import Optional, List
-from bot.logger import setup_logger
+from bot.logger import setup_logger, mask_user_id, mask_token, sanitize_log_message
 from bot.database import Trade, Position, Performance
 
 logger = setup_logger('TelegramBot')
@@ -154,7 +154,7 @@ class TradingBot:
         for chat_id in chat_ids:
             if chat_id not in self.monitoring_chats:
                 self.monitoring_chats.append(chat_id)
-                logger.info(f"Auto-starting monitoring for chat {chat_id}")
+                logger.info(f"Auto-starting monitoring for chat {mask_user_id(chat_id)}")
                 asyncio.create_task(self._monitoring_loop(chat_id))
     
     async def stopmonitor_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -175,7 +175,7 @@ class TradingBot:
     
     async def _monitoring_loop(self, chat_id: int):
         tick_queue = await self.market_data.subscribe_ticks(f'telegram_bot_{chat_id}')
-        logger.debug(f"Monitoring started for user {chat_id}")
+        logger.debug(f"Monitoring started for user {mask_user_id(chat_id)}")
         
         last_signal_check = datetime.now() - timedelta(seconds=self.config.SIGNAL_COOLDOWN_SECONDS)
         
@@ -203,9 +203,6 @@ class TradingBot:
                         indicators = indicator_engine.get_indicators(df_m1)
                         
                         if indicators:
-                            if self.position_tracker.has_active_position(chat_id):
-                                continue
-                            
                             signal = self.strategy.detect_signal(indicators, 'M1', signal_source='auto')
                             
                             if signal:
@@ -220,6 +217,9 @@ class TradingBot:
                                     
                                     if is_valid:
                                         async with self.signal_lock:
+                                            if self.position_tracker.has_active_position(chat_id):
+                                                continue
+                                            
                                             await self._send_signal(chat_id, chat_id, signal, df_m1)
                                         
                                         self.risk_manager.record_signal(chat_id)
@@ -234,7 +234,7 @@ class TradingBot:
                     
         finally:
             await self.market_data.unsubscribe_ticks(f'telegram_bot_{chat_id}')
-            logger.debug(f"Monitoring stopped for user {chat_id}")
+            logger.debug(f"Monitoring stopped for user {mask_user_id(chat_id)}")
     
     async def _send_signal(self, user_id: int, chat_id: int, signal: dict, df: Optional[pd.DataFrame] = None):
         try:
@@ -295,7 +295,7 @@ class TradingBot:
                 await self.app.bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown')
                 
                 if df is not None and len(df) >= 30:
-                    chart_path = self.chart_generator.generate_chart(df, signal, signal['timeframe'])
+                    chart_path = await self.chart_generator.generate_chart_async(df, signal, signal['timeframe'])
                     if chart_path:
                         with open(chart_path, 'rb') as photo:
                             await self.app.bot.send_photo(chat_id=chat_id, photo=photo)
@@ -317,7 +317,7 @@ class TradingBot:
                 signal['stop_loss'],
                 signal['take_profit']
             )
-            logger.info(f"Trade {trade_id} User:{user_id} {signal['signal']} @${signal['entry_price']:.2f}")
+            logger.info(f"Trade {trade_id} User:{mask_user_id(user_id)} {signal['signal']} @${signal['entry_price']:.2f}")
             
         except Exception as e:
             logger.error(f"Error sending signal: {e}")
@@ -490,7 +490,7 @@ class TradingBot:
             async with self.signal_lock:
                 await self._send_signal(user_id, chat_id, signal, df_m1)
             
-            logger.info(f"Manual signal sent to user {user_id}: {signal['signal']}")
+            logger.info(f"Manual signal sent to user {mask_user_id(user_id)}: {signal['signal']}")
             
         except Exception as e:
             logger.error(f"Error in getsignal_command: {e}")
@@ -596,17 +596,17 @@ class TradingBot:
             session.close()
             
             await update.message.reply_text("✅ Database trading berhasil direset!")
-            logger.info(f"Database reset by admin: {update.effective_user.id}")
+            logger.info(f"Database reset by admin: {mask_user_id(update.effective_user.id)}")
             
         except Exception as e:
             logger.error(f"Error resetting database: {e}")
             await update.message.reply_text(f"❌ Error: {str(e)}")
     
     async def addpremium_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        logger.info(f"/addpremium called by user {update.effective_user.id}")
+        logger.info(f"/addpremium called by user {mask_user_id(update.effective_user.id)}")
         
         if not self.is_admin(update.effective_user.id):
-            logger.warning(f"Non-admin user {update.effective_user.id} tried to use /addpremium")
+            logger.warning(f"Non-admin user {mask_user_id(update.effective_user.id)} tried to use /addpremium")
             await update.message.reply_text("⛔ Command ini hanya untuk admin.")
             return
         
@@ -674,7 +674,7 @@ class TradingBot:
                         f"Berakhir: {status['expires']}\n"
                     )
                     await update.message.reply_text(msg)
-                    logger.info(f"Admin {update.effective_user.id} added premium to {target_user_id} for {duration}")
+                    logger.info(f"Admin {mask_user_id(update.effective_user.id)} added premium to {mask_user_id(target_user_id)} for {duration}")
                     
                     try:
                         await self.app.bot.send_message(
@@ -686,7 +686,7 @@ class TradingBot:
                             parse_mode='Markdown'
                         )
                     except Exception as e:
-                        logger.warning(f"Could not send notification to user {target_user_id}: {e}")
+                        logger.warning(f"Could not send notification to user {mask_user_id(target_user_id)}: {e}")
                 else:
                     await update.message.reply_text("❌ Gagal menambahkan premium.")
             else:
@@ -721,26 +721,91 @@ class TradingBot:
         logger.info("Telegram bot initialized and ready!")
         return True
     
+    async def setup_webhook(self, webhook_url: str):
+        if not self.app:
+            logger.error("Bot not initialized! Call initialize() first.")
+            return False
+        
+        try:
+            logger.info(f"Setting up webhook: {webhook_url}")
+            await self.app.bot.set_webhook(url=webhook_url)
+            logger.info("Webhook configured successfully!")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to setup webhook: {e}")
+            if self.error_handler:
+                self.error_handler.log_exception(e, "setup_webhook")
+            return False
+    
+    async def run_webhook(self):
+        if not self.app:
+            logger.error("Bot not initialized! Call initialize() first.")
+            return
+        
+        logger.info("Telegram bot running in webhook mode...")
+        logger.info("Bot is ready to receive webhook updates")
+    
+    async def process_update(self, update_data: dict):
+        if not self.app:
+            logger.error("Bot not initialized! Cannot process update.")
+            return
+        
+        try:
+            from telegram import Update
+            update = Update.de_json(update_data, self.app.bot)
+            
+            if update:
+                await self.app.process_update(update)
+                logger.debug(f"Processed webhook update: {update.update_id}")
+            else:
+                logger.warning("Received invalid update data")
+                
+        except Exception as e:
+            logger.error(f"Error processing webhook update: {e}")
+            if self.error_handler:
+                self.error_handler.log_exception(e, "process_webhook_update")
+    
     async def run(self):
         if not self.app:
             logger.error("Bot not initialized! Call initialize() first.")
             return
         
-        logger.info("Starting Telegram bot polling...")
-        await self.app.updater.start_polling()
-        logger.info("Telegram bot is running!")
+        if self.config.TELEGRAM_WEBHOOK_MODE:
+            if not self.config.WEBHOOK_URL:
+                logger.error("WEBHOOK_URL not configured! Cannot use webhook mode.")
+                logger.error("Please set WEBHOOK_URL environment variable or disable webhook mode.")
+                return
+            
+            webhook_set = await self.setup_webhook(self.config.WEBHOOK_URL)
+            if not webhook_set:
+                logger.error("Failed to setup webhook! Bot cannot start in webhook mode.")
+                return
+            
+            await self.run_webhook()
+        else:
+            logger.info("Starting Telegram bot polling...")
+            await self.app.updater.start_polling()
+            logger.info("Telegram bot is running!")
     
     async def stop(self):
         if not self.app:
             return
         
-        logger.info("Stopping Telegram bot polling...")
-        try:
-            if self.app.updater and self.app.updater.running:
-                await self.app.updater.stop()
-                logger.info("Telegram bot polling stopped")
-        except Exception as e:
-            logger.error(f"Error stopping updater: {e}")
+        if self.config.TELEGRAM_WEBHOOK_MODE:
+            logger.info("Stopping Telegram bot webhook...")
+            try:
+                await self.app.bot.delete_webhook()
+                logger.info("Webhook deleted successfully")
+            except Exception as e:
+                logger.error(f"Error deleting webhook: {e}")
+        else:
+            logger.info("Stopping Telegram bot polling...")
+            try:
+                if self.app.updater and self.app.updater.running:
+                    await self.app.updater.stop()
+                    logger.info("Telegram bot polling stopped")
+            except Exception as e:
+                logger.error(f"Error stopping updater: {e}")
         
         try:
             await self.app.stop()

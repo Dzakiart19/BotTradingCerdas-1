@@ -4,6 +4,8 @@ import mplfinance as mpf
 from datetime import datetime
 from typing import Optional
 import json
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from bot.logger import setup_logger
 
 logger = setup_logger('ChartGenerator')
@@ -13,6 +15,7 @@ class ChartGenerator:
         self.config = config
         self.chart_dir = 'charts'
         os.makedirs(self.chart_dir, exist_ok=True)
+        self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="chart_gen")
     
     def generate_chart(self, df: pd.DataFrame, signal: Optional[dict] = None,
                       timeframe: str = 'M1') -> Optional[str]:
@@ -159,6 +162,22 @@ class ChartGenerator:
             logger.error(f"Error generating chart: {e}")
             return None
     
+    async def generate_chart_async(self, df: pd.DataFrame, signal: Optional[dict] = None,
+                                   timeframe: str = 'M1') -> Optional[str]:
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                self.executor,
+                self.generate_chart,
+                df,
+                signal,
+                timeframe
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Error in async chart generation: {e}")
+            return None
+    
     def delete_chart(self, filepath: str):
         try:
             if filepath and os.path.exists(filepath):
@@ -169,6 +188,14 @@ class ChartGenerator:
         except Exception as e:
             logger.error(f"Error deleting chart: {e}")
             return False
+    
+    def shutdown(self):
+        try:
+            logger.info("Shutting down ChartGenerator executor...")
+            self.executor.shutdown(wait=True, cancel_futures=True)
+            logger.info("ChartGenerator executor shut down successfully")
+        except Exception as e:
+            logger.error(f"Error shutting down executor: {e}")
     
     def cleanup_old_charts(self, days: int = 7):
         try:
