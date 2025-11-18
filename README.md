@@ -1,243 +1,291 @@
-# XAUUSD Trading Bot - Deriv WebSocket Client
+# 🤖 XAUUSD Trading Bot Pro V2.3
 
-Real-time streaming harga XAUUSD (Gold) menggunakan WebSocket Deriv tanpa API key.
+Bot trading otomatis untuk XAUUSD (Gold) dengan Telegram integration, dual-mode signal strategy, dan auto-monitoring 24/7.
 
-## 🚀 Features
+## ✨ Fitur Utama
 
-- ✅ **Real-time streaming** tick data XAUUSD dari Deriv
-- ✅ **Zero API key** required (100% gratis)
-- ✅ **Auto-reconnect** dengan error handling lengkap
-- ✅ **Heartbeat mechanism** (ping/pong setiap 20 detik)
-- ✅ **Production-ready** untuk Replit & Koyeb
-- ✅ **Simple & clean** code (hanya asyncio + websockets)
-- ✅ **Unlimited streaming** (24/7 no limits)
+- ✅ **Dual Signal Mode** - Auto (🤖 strict) & Manual (👤 relaxed) dengan logic terpisah
+- ✅ **Enhanced Scalping Strategy** - RSI crossover + EMA trend + Stochastic + Volume
+- ✅ **Real-time Market Data** - Streaming dari Deriv WebSocket (gratis, tanpa API key)
+- ✅ **Auto Position Tracking** - Monitor posisi sampai TP/SL tercapai
+- ✅ **Chart Generation** - Setiap sinyal dengan chart + indikator lengkap
+- ✅ **Risk Management** - Dynamic SL/TP, spread filter, daily loss limit
+- ✅ **Signal Source Tracking** - Database track auto vs manual terpisah
+- ✅ **Premium Subscription** - Paket mingguan/bulanan dengan auto-expiry
+- ✅ **Admin Commands** - User management & database control
+- ✅ **24/7 Monitoring** - Auto-start untuk authorized users
+- ✅ **Auto-Migration** - Database schema updates tanpa data loss
 
-## 📊 Data Source
+## 🎯 Dual Signal Strategy (V2.3)
 
-**WebSocket Provider:** Deriv  
-**URL:** `wss://ws.derivws.com/websockets/v3?app_id=1089`  
-**Symbol:** `frxXAUUSD` (Gold vs USD)  
-**Subscribe Payload:** `{"ticks": "frxXAUUSD"}`
+### 🤖 Auto Mode (Strict - High Precision)
+**Logic:** AND (semua kondisi harus terpenuhi)
+- ✅ EMA trend alignment (5 > 10 > 20 untuk BUY)
+- ✅ RSI > 50 untuk BUY, < 50 untuk SELL
+- ✅ Stochastic K/D crossover confirmation
+- ✅ Volume > 0.5x average
 
-## 🛠️ Tech Stack
+**Keuntungan:** Akurasi tinggi, sinyal berkualitas
+**Kekurangan:** Lebih jarang muncul
 
-- **Python 3.11+**
-- **asyncio** - Async/await operations
-- **websockets** - WebSocket client library
+### 👤 Manual Mode (Relaxed - More Opportunities)
+**Logic:** OR (flexible conditions)
+- ✅ EMA trend OR EMA crossover
+- ✅ RSI crossover zone OR bullish/bearish
+- ✅ Stochastic & Volume opsional
+
+**Keuntungan:** Lebih banyak peluang trading
+**Kekurangan:** Perlu validasi manual
+
+**Fallback:** Gracefully handle missing historical data (rsi_prev, stoch_prev)
+
+## 📊 Indicators
+
+- **EMA:** 5, 10, 20 (trend & momentum)
+- **RSI:** 14 (overbought/oversold + crossover)
+- **Stochastic:** K=14, D=3 (momentum confirmation)
+- **ATR:** 14 (volatility for SL/TP)
+- **Volume:** 0.5x average threshold
+
+## 🛡️ Risk Management
+
+- **Stop Loss:** 1.0x ATR (min 20 pips)
+- **Take Profit:** 1.5x R:R (min 30 pips)
+- **Max Spread:** 10 pips
+- **Signal Cooldown:** 30 detik (auto mode)
+- **Daily Loss Limit:** 3% dari balance
+- **Risk per Trade:** 0.5% dari balance
+
+## 📱 Telegram Commands
+
+```
+/start       - Menu utama + status subscription
+/help        - Bantuan lengkap semua command
+
+📊 TRADING
+/monitor     - Mulai monitoring sinyal otomatis (🤖)
+/stopmonitor - Stop monitoring
+/getsignal   - Generate sinyal manual sekarang (👤)
+/status      - Status posisi aktif & monitoring
+
+📈 ANALISIS
+/riwayat     - Riwayat trading (WIN/LOSE)
+/performa    - Statistik & performa bot
+/settings    - Lihat konfigurasi indikator
+
+👑 PREMIUM
+/premium     - Info paket subscription
+/beli        - Cara langganan premium
+
+🔧 ADMIN ONLY
+/riset       - Reset database trading
+/addpremium  - Tambah user premium
+```
+
+## 🚀 Quick Start
+
+### 1. Environment Variables
+
+Buat file `.env` (lihat `.env.example` untuk template):
+
+```bash
+# WAJIB
+TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
+AUTHORIZED_USER_IDS=123456789,987654321
+
+# OPTIONAL (sudah ada default bagus)
+SIGNAL_COOLDOWN_SECONDS=30
+MAX_SPREAD_PIPS=10.0
+SL_ATR_MULTIPLIER=1.0
+TP_RR_RATIO=1.5
+```
+
+### 2. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Run Bot
+
+```bash
+python main.py
+```
+
+## 🐳 Deploy ke Koyeb
+
+Lihat panduan lengkap di **[DEPLOYMENT_KOYEB.md](DEPLOYMENT_KOYEB.md)**
+
+**Highlight:**
+- ✅ Dockerfile sudah optimized untuk Debian Trixie
+- ✅ Auto-migration database on startup
+- ✅ Health check endpoint (/health:8080)
+- ✅ Zero API key untuk market data
+- ✅ Free tier ready
 
 ## 📂 Project Structure
 
 ```
-.
-├── main.py                  # Deriv WebSocket client (production)
-├── requirements.txt         # Dependencies (websockets only)
-├── README.md                # This file
-├── replit.md                # Project notes
-├── old_trading_bot/         # Backup legacy code (archived)
-├── main_old_backup.py       # Backup old orchestrator
-└── README_old_backup.md     # Backup old documentation
-```
-
-**Note:** `old_trading_bot/` folder contains archived legacy trading bot code yang sudah tidak dipakai. Folder ini hanya untuk backup reference.
-
-## 📦 Installation & Usage
-
-### Replit (Recommended)
-
-1. Fork atau clone repository ini
-2. Bot otomatis running dengan workflow `deriv-websocket`
-3. View logs di Console tab untuk melihat tick streaming
-
-### Koyeb
-
-1. Deploy dari GitHub repository
-2. Set build command: (none)
-3. Set run command: `python main.py`
-4. Port: tidak perlu (console app)
-
-### Local Development
-
-```bash
-# Install dependencies
-pip install websockets
-
-# Run
-python main.py
-```
-
-## 📝 Output Format
-
-```
-[epoch] YYYY-MM-DD HH:MM:SS | bid=XXXX.XX, ask=XXXX.XX, quote=XXXX.XX
-```
-
-**Contoh:**
-```
-[1763421819] 2025-11-17 23:23:39 | bid=4049.70, ask=4051.03, quote=4050.37
-[1763421820] 2025-11-17 23:23:40 | bid=4049.57, ask=4050.83, quote=4050.20
-[1763421821] 2025-11-17 23:23:41 | bid=4049.60, ask=4050.90, quote=4050.25
+├── main.py                 # Orchestrator (entry point)
+├── config.py               # Konfigurasi & environment vars
+├── requirements.txt        # Python dependencies
+├── Dockerfile              # Container config (Koyeb ready)
+├── .env.example            # Template environment variables
+│
+├── bot/                    # Core modules
+│   ├── market_data.py      # Deriv WebSocket client
+│   ├── strategy.py         # Signal detection (dual mode)
+│   ├── indicators.py       # Technical indicators
+│   ├── telegram_bot.py     # Telegram integration
+│   ├── position_tracker.py # Real-time position monitoring
+│   ├── chart_generator.py  # Chart dengan indikator
+│   ├── risk_manager.py     # SL/TP & risk calculation
+│   ├── database.py         # SQLite ORM (auto-migration)
+│   ├── user_manager.py     # Subscription & access control
+│   ├── alert_system.py     # Telegram notifications
+│   ├── task_scheduler.py   # Background jobs
+│   └── error_handler.py    # Error logging & recovery
+│
+├── data/                   # Database files (auto-created)
+├── logs/                   # Application logs (auto-created)
+├── charts/                 # Generated charts (auto-cleanup)
+│
+├── README.md               # Dokumentasi utama (file ini)
+├── replit.md               # System architecture & changelog
+├── DEPLOYMENT_KOYEB.md     # Panduan deploy
+└── TRADING_STRATEGY.md     # Penjelasan strategi detail
 ```
 
 ## 🔧 Configuration
 
-Konfigurasi ada di dalam `main.py`:
+Semua parameter bisa diubah via environment variables. Default values sudah optimal untuk M1-M5 scalping.
 
-```python
-DERIV_WS_URL = "wss://ws.derivws.com/websockets/v3?app_id=1089"
-SYMBOL = "frxXAUUSD"
-HEARTBEAT_INTERVAL = 20  # seconds
-RECONNECT_DELAY = 3      # seconds
+**Recommended Settings:**
+- `SIGNAL_COOLDOWN_SECONDS=30` - Balance antara spam & opportunity
+- `MAX_SPREAD_PIPS=10.0` - Filter spread terlalu lebar
+- `TP_RR_RATIO=1.5` - Risk:Reward 1:1.5 (realistis)
+- `DAILY_LOSS_PERCENT=3.0` - Stop trading jika loss 3%
+
+Lihat `.env.example` untuk daftar lengkap.
+
+## 📊 Database Schema
+
+Bot menggunakan SQLite dengan auto-migration:
+
+- **trades** - Riwayat trade dengan result (WIN/LOSE)
+- **signal_logs** - Log semua sinyal (termasuk yang ditolak)
+- **positions** - Posisi aktif untuk tracking
+- **performance** - Statistik harian
+- **users** - User subscription & access control
+
+**Auto-Migration:** Saat restart, bot otomatis detect & add kolom baru tanpa data loss.
+
+## 🎨 Chart Features
+
+Setiap sinyal disertai chart profesional:
+- **Candlestick** dengan volume bar
+- **EMA 5, 10, 20** untuk trend
+- **RSI panel** dengan level overbought/oversold
+- **Stochastic panel** dengan K/D lines
+- **Entry/SL/TP markers** (untuk exit charts)
+
+Auto-cleanup setelah 60 menit untuk hemat storage.
+
+## 💎 Premium Subscription
+
+**Paket Tersedia:**
+- **Weekly:** Rp 15.000 (7 hari)
+- **Monthly:** Rp 30.000 (30 hari)
+
+**Benefits:**
+- ✅ Unlimited signals 24/7
+- ✅ Auto-monitoring
+- ✅ Position tracking
+- ✅ All premium features
+
+**Cara Beli:** Hubungi @dzeckyete di Telegram
+
+**Admin:** Akses unlimited selamanya
+
+## 📈 Performance Tracking
+
+Bot track performa auto vs manual terpisah:
+
+```sql
+SELECT 
+    signal_source, 
+    COUNT(*) as total,
+    SUM(CASE WHEN result='WIN' THEN 1 ELSE 0 END) as wins,
+    ROUND(AVG(actual_pl), 2) as avg_profit
+FROM trades 
+GROUP BY signal_source;
 ```
 
-## 🔄 Auto-Reconnect
+Gunakan `/performa` di Telegram untuk statistik lengkap.
 
-Bot otomatis reconnect jika terjadi:
-- Connection timeout
-- DNS resolution error
-- WebSocket closed by server
-- Network interruption
+## 🔍 Troubleshooting
 
-Delay: **3 detik** antara setiap reconnect attempt.
+### Bot Tidak Respond
+- Check `TELEGRAM_BOT_TOKEN` benar
+- Check `AUTHORIZED_USER_IDS` match dengan user ID Anda
+- Lihat logs untuk error: `tail -f logs/main.log`
 
-## 🏥 Error Handling
+### Database Error
+- Check file `data/bot.db` tidak corrupt
+- Hapus file `data/bot.db*` untuk reset (DANGER: data hilang!)
+- Auto-migration akan handle schema updates
 
-Bot handle berbagai error:
-- `websockets.exceptions.ConnectionClosed`
-- `asyncio.TimeoutError`
-- `socket.gaierror` (DNS)
-- `json.JSONDecodeError`
-- Generic exceptions
+### No Signals
+- Auto mode strict, perlu semua kondisi terpenuhi
+- Gunakan `/getsignal` untuk manual mode (lebih banyak peluang)
+- Check market buka (XAUUSD trading 24/5, tutup weekend)
 
-## 🎯 Use Cases
+### Docker Build Failed (Koyeb)
+- ✅ SUDAH FIXED di V2.3
+- Dockerfile menggunakan `libgl1` untuk Debian Trixie
+- Build sekarang berjalan lancar
 
-1. **Market Data Streaming** - Real-time price monitoring
-2. **Trading Signal Development** - Build indicators dari tick data
-3. **Price Alert System** - Monitor dan alert harga tertentu
-4. **Trading Bot** - Automated trading signals
-5. **Market Analysis** - Historical tick data collection
+## 📚 Documentation
 
-## 📈 Data Fields
+- **[TRADING_STRATEGY.md](TRADING_STRATEGY.md)** - Strategi scalping detail
+- **[DEPLOYMENT_KOYEB.md](DEPLOYMENT_KOYEB.md)** - Deploy guide
+- **[replit.md](replit.md)** - System architecture & recent changes
 
-Setiap tick mengandung:
-- **epoch** - Unix timestamp (seconds)
-- **bid** - Harga bid (sell)
-- **ask** - Harga ask (buy)
-- **quote** - Mid price (average bid/ask)
+## 🔄 Recent Changes (V2.3)
 
-## 🚦 Status Messages
+**Date:** November 18, 2025
 
-- `✅ Connected` - WebSocket berhasil connect
-- `📡 Subscribed` - Subscribe ke symbol berhasil
-- `⚠️ Disconnected` - Connection lost, akan reconnect
-- `🔄 Connecting` - Sedang connecting
-- `❌ API Error` - Error dari Deriv API
-
-## ⚙️ Advanced Usage
-
-### Custom Symbol
-
-Untuk symbol lain (contoh EUR/USD):
-```python
-SYMBOL = "frxEURUSD"
-```
-
-### Adjust Heartbeat
-
-Untuk heartbeat lebih cepat/lambat:
-```python
-HEARTBEAT_INTERVAL = 10  # 10 detik
-```
-
-### Adjust Reconnect Delay
-
-Untuk reconnect lebih cepat/lambat:
-```python
-RECONNECT_DELAY = 5  # 5 detik
-```
-
-## 📊 Performance
-
-- **Latency:** < 100ms (real-time streaming)
-- **Tick Rate:** ~1-2 ticks per second
-- **Uptime:** 99.9% (dengan auto-reconnect)
-- **CPU Usage:** Minimal (~5-10%)
-- **Memory:** ~20-30 MB
-
-## 🔒 Security
-
-- ✅ No API key required
-- ✅ No authentication needed
-- ✅ Public demo app ID (1089)
-- ✅ Read-only data access
-- ✅ No sensitive data stored
-
-## 🌐 Deployment
-
-### Replit
-- Always-on: Enable boost atau hacker plan
-- Console output: Visible di logs tab
-- Auto-restart: Handled by Replit
-
-### Koyeb
-- Dyno type: Free tier OK
-- Region: Any (recommend EU/US)
-- Logs: Available di dashboard
-
-### VPS
-```bash
-# Install Python
-sudo apt install python3 python3-pip
-
-# Install dependencies
-pip3 install websockets
-
-# Run dengan screen/tmux
-screen -S xauusd
-python3 main.py
-# Ctrl+A+D to detach
-```
-
-## 🐛 Troubleshooting
-
-### Connection Failed
-```
-⚠️ Connection timeout
-```
-**Solution:** Check internet connection, Deriv mungkin maintenance
-
-### No Data Received
-```
-✅ Connected
-📡 Subscribed to frxXAUUSD
-(no ticks)
-```
-**Solution:** Market closed atau symbol tidak ada
-
-### High CPU Usage
-**Solution:** Adjust HEARTBEAT_INTERVAL ke nilai lebih besar (30-60s)
-
-## 📜 License
-
-MIT License - Free to use and modify
-
-## 🤝 Contributing
-
-Pull requests welcome! Untuk perubahan major, silakan open issue terlebih dahulu.
-
-## 📧 Support
-
-Untuk bug reports atau feature requests, silakan open issue di GitHub.
+1. ✅ Fixed Koyeb deployment error (libgl1-mesa-glx → libgl1)
+2. ✅ Dual-mode signal strategy (auto strict + manual relaxed)
+3. ✅ Enhanced scalping strategy (RSI crossover + EMA + Volume)
+4. ✅ Database schema update (signal_source field)
+5. ✅ Auto-migration system (backward compatible)
+6. ✅ Manual signal bug fix (graceful fallback for missing data)
+7. ✅ Enhanced signal messages (source icons + confidence reasons)
 
 ## ⚠️ Disclaimer
 
-Bot ini HANYA untuk informasi dan edukasi. TIDAK ada eksekusi trading otomatis. User bertanggung jawab penuh atas semua keputusan trading.
+**PENTING:** Bot ini untuk informasi dan edukasi trading saja. TIDAK ada eksekusi trading otomatis ke broker. User bertanggung jawab penuh atas semua keputusan trading berdasarkan sinyal bot.
+
+Trading forex/gold berisiko tinggi. Gunakan dengan bijak dan risk management yang baik.
+
+## 📄 License
+
+MIT License - Free to use and modify
+
+## 🤝 Support
+
+- **Telegram:** @dzeckyete
+- **Issues:** Open issue di GitHub repository
+- **Subscription:** Hubungi @dzeckyete
 
 ## 🔗 Links
 
-- **Deriv API Docs:** https://api.deriv.com
-- **WebSocket Docs:** https://api.deriv.com/docs/websocket/
-- **Symbol List:** https://api.deriv.com/api-explorer#ticks
+- **Deriv API:** https://api.deriv.com
+- **Telegram Bot API:** https://core.telegram.org/bots/api
+- **XAUUSD Info:** https://www.investing.com/currencies/xau-usd
 
 ---
 
 **Made with ❤️ for XAUUSD traders**
+**Version 2.3 - Enhanced Strategy & Signal Separation**
