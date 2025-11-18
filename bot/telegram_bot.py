@@ -283,18 +283,28 @@ class TradingBot:
             source_icon = "🤖" if signal_source == 'auto' else "👤"
             source_text = "OTOMATIS" if signal_source == 'auto' else "MANUAL"
             
+            trend_desc = signal.get('trend_description', 'MEDIUM ⚡')
+            expected_profit = signal.get('expected_profit', 1.5)
+            expected_loss = signal.get('expected_loss', 1.0)
+            rr_ratio = signal.get('rr_ratio', 1.5)
+            
             msg = (
                 f"🚨 *SINYAL {signal['signal']}* {source_icon}\n\n"
                 f"*Source:* {source_text}\n"
                 f"*Ticker:* XAUUSD\n"
                 f"*Timeframe:* {signal['timeframe']}\n"
+                f"*Trend Strength:* {trend_desc}\n\n"
                 f"*Entry:* ${signal['entry_price']:.2f}\n"
                 f"*Stop Loss:* ${signal['stop_loss']:.2f} ({sl_pips:.1f} pips)\n"
-                f"*Take Profit:* ${signal['take_profit']:.2f} ({tp_pips:.1f} pips)\n"
+                f"*Take Profit:* ${signal['take_profit']:.2f} ({tp_pips:.1f} pips)\n\n"
+                f"💰 *Risk Management:*\n"
+                f"• Max Loss: ${expected_loss:.2f}\n"
+                f"• Target Profit: ${expected_profit:.2f}\n"
+                f"• R:R Ratio: 1:{rr_ratio:.2f}\n"
             )
             
             if 'confidence_reasons' in signal and signal['confidence_reasons']:
-                msg += f"\n*Alasan:*\n"
+                msg += f"\n*Alasan Teknikal:*\n"
                 for reason in signal['confidence_reasons']:
                     msg += f"• {reason}\n"
             

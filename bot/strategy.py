@@ -7,6 +7,77 @@ logger = setup_logger('Strategy')
 class TradingStrategy:
     def __init__(self, config):
         self.config = config
+    
+    def calculate_trend_strength(self, indicators: Dict) -> tuple[float, str]:
+        """
+        Calculate trend strength dari 0.0 (weak) sampai 1.0 (very strong)
+        Returns: (strength_score, description)
+        """
+        score = 0.0
+        factors = []
+        
+        try:
+            ema_short = indicators.get(f'ema_{self.config.EMA_PERIODS[0]}')
+            ema_mid = indicators.get(f'ema_{self.config.EMA_PERIODS[1]}')
+            ema_long = indicators.get(f'ema_{self.config.EMA_PERIODS[2]}')
+            macd_histogram = indicators.get('macd_histogram')
+            rsi = indicators.get('rsi')
+            atr = indicators.get('atr')
+            close = indicators.get('close')
+            volume = indicators.get('volume')
+            volume_avg = indicators.get('volume_avg')
+            
+            if (ema_short is not None and ema_mid is not None and 
+                ema_long is not None and close is not None and close > 0):
+                ema_separation = abs(ema_short - ema_long) / close
+                if ema_separation > 0.003:
+                    score += 0.25
+                    factors.append("EMA spread lebar")
+                elif ema_separation > 0.0015:
+                    score += 0.15
+                    factors.append("EMA spread medium")
+            
+            if macd_histogram is not None:
+                macd_strength = abs(macd_histogram)
+                if macd_strength > 0.5:
+                    score += 0.25
+                    factors.append("MACD histogram kuat")
+                elif macd_strength > 0.2:
+                    score += 0.15
+                    factors.append("MACD histogram medium")
+            
+            if rsi is not None:
+                rsi_momentum = abs(rsi - 50) / 50
+                if rsi_momentum > 0.4:
+                    score += 0.25
+                    factors.append("RSI momentum tinggi")
+                elif rsi_momentum > 0.2:
+                    score += 0.15
+                    factors.append("RSI momentum medium")
+            
+            if volume is not None and volume_avg is not None and volume_avg > 0:
+                volume_ratio = volume / volume_avg
+                if volume_ratio > 1.5:
+                    score += 0.25
+                    factors.append("Volume sangat tinggi")
+                elif volume_ratio > 1.0:
+                    score += 0.15
+                    factors.append("Volume tinggi")
+            
+            if score >= 0.75:
+                description = "SANGAT KUAT 🔥"
+            elif score >= 0.5:
+                description = "KUAT 💪"
+            elif score >= 0.3:
+                description = "MEDIUM ⚡"
+            else:
+                description = "LEMAH 📊"
+            
+            return min(score, 1.0), description
+            
+        except Exception as e:
+            logger.error(f"Error calculating trend strength: {e}")
+            return 0.3, "MEDIUM ⚡"
         
     def detect_signal(self, indicators: Dict, timeframe: str = 'M1', signal_source: str = 'auto') -> Optional[Dict]:
         if not indicators:
@@ -139,8 +210,12 @@ class TradingStrategy:
                         confidence_reasons.append("Stochastic konfirmasi bearish")
             
             if signal:
+                trend_strength, trend_desc = self.calculate_trend_strength(indicators)
+                
+                dynamic_tp_ratio = 1.0 + (trend_strength * 1.5)
+                
                 fixed_risk = self.config.FIXED_RISK_AMOUNT
-                target_profit = fixed_risk * self.config.TP_RR_RATIO
+                target_profit = fixed_risk * dynamic_tp_ratio
                 min_lot = self.config.LOT_SIZE
                 
                 required_sl_pips = fixed_risk / min_lot
@@ -156,7 +231,13 @@ class TradingStrategy:
                     stop_loss = close + sl_distance
                     take_profit = close - tp_distance
                 
-                logger.info(f"{signal} signal detected ({signal_source}) on {timeframe}: {', '.join(confidence_reasons)}")
+                expected_profit = target_profit
+                expected_loss = fixed_risk
+                
+                logger.info(f"{signal} signal detected ({signal_source}) on {timeframe}")
+                logger.info(f"Trend Strength: {trend_desc} (score: {trend_strength:.2f})")
+                logger.info(f"Dynamic TP Ratio: {dynamic_tp_ratio:.2f}x (Expected profit: ${expected_profit:.2f})")
+                logger.info(f"Risk: ${expected_loss:.2f} | Reward: ${expected_profit:.2f} | R:R = 1:{dynamic_tp_ratio:.2f}")
                 
                 return {
                     'signal': signal,
@@ -165,6 +246,11 @@ class TradingStrategy:
                     'stop_loss': float(stop_loss),
                     'take_profit': float(take_profit),
                     'timeframe': timeframe,
+                    'trend_strength': trend_strength,
+                    'trend_description': trend_desc,
+                    'expected_profit': expected_profit,
+                    'expected_loss': expected_loss,
+                    'rr_ratio': dynamic_tp_ratio,
                     'indicators': json.dumps({
                         'ema_short': float(ema_short) if ema_short is not None else None,
                         'ema_mid': float(ema_mid) if ema_mid is not None else None,
