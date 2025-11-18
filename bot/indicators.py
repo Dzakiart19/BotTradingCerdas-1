@@ -48,7 +48,7 @@ class IndicatorEngine:
         return df['volume'].rolling(window=period).mean()
     
     def get_indicators(self, df: pd.DataFrame) -> Optional[Dict]:
-        if len(df) < max(self.ema_periods + [self.rsi_period, self.stoch_k_period, self.atr_period]) + 10:
+        if len(df) < max(self.ema_periods + [self.rsi_period, self.stoch_k_period, self.atr_period]) + 2:
             return None
         
         indicators = {}
