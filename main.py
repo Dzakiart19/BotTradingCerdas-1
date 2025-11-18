@@ -93,6 +93,66 @@ class TradingBotOrchestrator:
         logger.info("Task scheduler initialized")
         
         logger.info("All components initialized successfully")
+    
+    def _auto_detect_webhook_url(self) -> Optional[str]:
+        """Auto-detect webhook URL for Replit and other cloud platforms
+        
+        Returns:
+            str: Auto-detected webhook URL or None if not detected
+        """
+        if self.config.WEBHOOK_URL and self.config.WEBHOOK_URL.strip():
+            return None
+        
+        import json
+        from urllib.parse import urlparse
+        
+        replit_domains = os.getenv('REPLIT_DOMAINS')
+        replit_dev_domain = os.getenv('REPLIT_DEV_DOMAIN')
+        
+        domain = None
+        
+        if replit_domains:
+            try:
+                domains_list = json.loads(replit_domains)
+                if isinstance(domains_list, list) and len(domains_list) > 0:
+                    domain = str(domains_list[0]).strip()
+                    logger.info(f"Detected Replit deployment domain from REPLIT_DOMAINS: {domain}")
+                else:
+                    logger.warning(f"REPLIT_DOMAINS is not a valid array: {replit_domains}")
+            except json.JSONDecodeError:
+                domain = replit_domains.strip().strip('[]"\'').split(',')[0].strip().strip('"\'')
+                logger.warning(f"Failed to parse REPLIT_DOMAINS as JSON, using fallback: {domain}")
+            except Exception as e:
+                logger.error(f"Error parsing REPLIT_DOMAINS: {e}")
+        
+        if not domain and replit_dev_domain:
+            domain = replit_dev_domain.strip()
+            logger.info(f"Detected Replit dev domain from REPLIT_DEV_DOMAIN: {domain}")
+        
+        if domain:
+            domain = domain.strip().strip('"\'')
+            
+            if not domain or domain.startswith('[') or domain.startswith('{') or '"' in domain or "'" in domain or '://' in domain:
+                logger.error(f"Invalid domain detected after parsing: {domain}")
+                return None
+            
+            try:
+                test_url = f"https://{domain}"
+                parsed = urlparse(test_url)
+                if not parsed.netloc or parsed.netloc != domain:
+                    logger.error(f"Domain validation failed - invalid structure: {domain}")
+                    return None
+            except Exception as e:
+                logger.error(f"Domain validation error: {e}")
+                return None
+            
+            webhook_url = f"https://{domain}/webhook"
+            
+            logger.info(f"✅ Auto-constructed webhook URL: {webhook_url}")
+            return webhook_url
+        
+        logger.warning("Could not auto-detect webhook URL - no Replit domain found")
+        return None
         
     async def start_health_server(self):
         try:
@@ -188,6 +248,15 @@ class TradingBotOrchestrator:
             logger.info("Telegram Bot Token: NOT CONFIGURED")
         
         logger.info(f"Authorized Users: {len(self.config.AUTHORIZED_USER_IDS)}")
+        
+        if self.config.TELEGRAM_WEBHOOK_MODE:
+            webhook_url = self._auto_detect_webhook_url()
+            if webhook_url:
+                self.config.WEBHOOK_URL = webhook_url
+                logger.info(f"Webhook URL auto-detected: {webhook_url}")
+            else:
+                logger.info(f"Webhook mode enabled with URL: {self.config.WEBHOOK_URL}")
+        
         logger.info("=" * 60)
         
         if not self.config.TELEGRAM_BOT_TOKEN:

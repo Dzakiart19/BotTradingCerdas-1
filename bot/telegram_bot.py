@@ -721,21 +721,67 @@ class TradingBot:
         logger.info("Telegram bot initialized and ready!")
         return True
     
-    async def setup_webhook(self, webhook_url: str):
+    async def setup_webhook(self, webhook_url: str, max_retries: int = 3):
         if not self.app:
             logger.error("Bot not initialized! Call initialize() first.")
             return False
         
-        try:
-            logger.info(f"Setting up webhook: {webhook_url}")
-            await self.app.bot.set_webhook(url=webhook_url)
-            logger.info("Webhook configured successfully!")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to setup webhook: {e}")
-            if self.error_handler:
-                self.error_handler.log_exception(e, "setup_webhook")
+        if not webhook_url or not webhook_url.strip():
+            logger.error("Invalid webhook URL provided - empty or None")
             return False
+        
+        webhook_url = webhook_url.strip()
+        
+        if not (webhook_url.startswith('http://') or webhook_url.startswith('https://')):
+            logger.error(f"Invalid webhook URL format: {webhook_url[:50]}... (must start with http:// or https://)")
+            return False
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                logger.info(f"Setting up webhook (attempt {attempt}/{max_retries}): {webhook_url}")
+                
+                await self.app.bot.set_webhook(
+                    url=webhook_url,
+                    allowed_updates=['message', 'callback_query', 'edited_message'],
+                    drop_pending_updates=True
+                )
+                
+                webhook_info = await self.app.bot.get_webhook_info()
+                
+                if webhook_info.url == webhook_url:
+                    logger.info(f"✅ Webhook configured successfully!")
+                    logger.info(f"Webhook URL: {webhook_info.url}")
+                    logger.info(f"Pending updates: {webhook_info.pending_update_count}")
+                    return True
+                else:
+                    logger.warning(f"Webhook URL mismatch - Expected: {webhook_url}, Got: {webhook_info.url}")
+                    if attempt < max_retries:
+                        logger.info(f"Retrying in {attempt * 2} seconds...")
+                        await asyncio.sleep(attempt * 2)
+                        continue
+                    return False
+                    
+            except Exception as e:
+                error_type = type(e).__name__
+                logger.error(f"Failed to setup webhook (attempt {attempt}/{max_retries}): [{error_type}] {e}")
+                
+                if self.error_handler:
+                    self.error_handler.log_exception(e, f"setup_webhook_attempt_{attempt}")
+                
+                if attempt < max_retries:
+                    wait_time = attempt * 2
+                    logger.info(f"Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error("❌ All webhook setup attempts failed!")
+                    logger.error("Please check:")
+                    logger.error("  1. Webhook URL is publicly accessible")
+                    logger.error("  2. SSL certificate is valid (for HTTPS)")
+                    logger.error("  3. Telegram Bot API can reach your server")
+                    logger.error("  4. No firewall blocking incoming connections")
+                    return False
+        
+        return False
     
     async def run_webhook(self):
         if not self.app:
@@ -745,25 +791,73 @@ class TradingBot:
         logger.info("Telegram bot running in webhook mode...")
         logger.info("Bot is ready to receive webhook updates")
     
-    async def process_update(self, update_data: dict):
+    async def process_update(self, update_data):
         if not self.app:
             logger.error("Bot not initialized! Cannot process update.")
             return
         
+        if not update_data:
+            logger.error("Received empty update data")
+            return
+        
         try:
             from telegram import Update
-            update = Update.de_json(update_data, self.app.bot)
+            import json
+            
+            if isinstance(update_data, Update):
+                update = update_data
+                logger.debug(f"Received native telegram.Update object: {update.update_id}")
+            else:
+                parsed_data = update_data
+                
+                if isinstance(update_data, str):
+                    try:
+                        parsed_data = json.loads(update_data)
+                        logger.debug("Parsed webhook update from JSON string")
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse JSON string update: {e}")
+                        return
+                elif hasattr(update_data, 'to_dict') and callable(update_data.to_dict):
+                    try:
+                        parsed_data = update_data.to_dict()
+                        logger.debug(f"Converted update data via to_dict(): {type(update_data)}")
+                    except Exception as e:
+                        logger.warning(f"Failed to convert via to_dict: {e}")
+                elif not hasattr(update_data, '__getitem__'):
+                    logger.warning(f"Update data is not dict-like: {type(update_data)}")
+                    logger.debug(f"Attempting to use as-is: {str(update_data)[:200]}")
+                
+                update = Update.de_json(parsed_data, self.app.bot)
             
             if update:
-                await self.app.process_update(update)
-                logger.debug(f"Processed webhook update: {update.update_id}")
-            else:
-                logger.warning("Received invalid update data")
+                update_id = update.update_id
+                logger.debug(f"Processing webhook update: {update_id}")
                 
+                await self.app.process_update(update)
+                
+                logger.debug(f"✅ Successfully processed update: {update_id}")
+            else:
+                logger.warning("Received invalid or malformed update data")
+                if isinstance(parsed_data, Mapping):
+                    logger.debug(f"Update data keys: {list(parsed_data.keys())}")
+                
+        except ValueError as e:
+            logger.error(f"ValueError parsing update data: {e}")
+            logger.debug(f"Problematic update data: {str(update_data)[:200]}...")
+        except AttributeError as e:
+            logger.error(f"AttributeError processing update: {e}")
+            if self.error_handler:
+                self.error_handler.log_exception(e, "process_webhook_update_attribute")
         except Exception as e:
-            logger.error(f"Error processing webhook update: {e}")
+            error_type = type(e).__name__
+            logger.error(f"Unexpected error processing webhook update: [{error_type}] {e}")
             if self.error_handler:
                 self.error_handler.log_exception(e, "process_webhook_update")
+            
+            if hasattr(e, '__traceback__'):
+                import traceback
+                tb_str = ''.join(traceback.format_tb(e.__traceback__)[:3])
+                logger.debug(f"Traceback: {tb_str}")
     
     async def run(self):
         if not self.app:

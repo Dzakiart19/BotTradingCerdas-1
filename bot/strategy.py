@@ -157,25 +157,82 @@ class TradingStrategy:
                 volume_strong = volume > volume_avg * self.config.VOLUME_THRESHOLD_MULTIPLIER
             
             if signal_source == 'auto':
-                if (ema_trend_bullish and macd_bullish_crossover and rsi_bullish and volume_strong):
+                bullish_score = 0
+                bearish_score = 0
+                
+                if ema_trend_bullish:
+                    bullish_score += 2
+                if ema_trend_bearish:
+                    bearish_score += 2
+                
+                if macd_bullish_crossover:
+                    bullish_score += 2
+                elif macd_bullish:
+                    bullish_score += 1
+                    
+                if macd_bearish_crossover:
+                    bearish_score += 2
+                elif macd_bearish:
+                    bearish_score += 1
+                
+                if rsi_bullish:
+                    bullish_score += 1
+                if rsi_bearish:
+                    bearish_score += 1
+                    
+                if rsi_oversold_crossup:
+                    bullish_score += 1
+                if rsi_overbought_crossdown:
+                    bearish_score += 1
+                
+                if stoch_bullish:
+                    bullish_score += 1
+                if stoch_bearish:
+                    bearish_score += 1
+                
+                if volume_strong:
+                    if bullish_score > bearish_score:
+                        bullish_score += 1
+                    elif bearish_score > bullish_score:
+                        bearish_score += 1
+                
+                min_score_required = 4
+                
+                if bullish_score >= min_score_required and bullish_score > bearish_score:
                     signal = 'BUY'
-                    confidence_reasons.append("EMA trend bullish")
-                    confidence_reasons.append("MACD bullish crossover (konfirmasi kuat)")
-                    confidence_reasons.append("RSI di atas 50 (momentum bullish)")
+                    if ema_trend_bullish:
+                        confidence_reasons.append("EMA trend bullish")
+                    if macd_bullish_crossover:
+                        confidence_reasons.append("MACD bullish crossover (konfirmasi kuat)")
+                    elif macd_bullish:
+                        confidence_reasons.append("MACD bullish")
+                    if rsi_oversold_crossup:
+                        confidence_reasons.append("RSI keluar dari oversold")
+                    elif rsi_bullish:
+                        confidence_reasons.append("RSI di atas 50 (momentum bullish)")
                     if stoch_bullish:
                         confidence_reasons.append("Stochastic konfirmasi bullish")
                     if volume_strong:
                         confidence_reasons.append("Volume tinggi konfirmasi")
+                    confidence_reasons.append(f"Signal score: {bullish_score}/{bearish_score}")
                         
-                elif (ema_trend_bearish and macd_bearish_crossover and rsi_bearish and volume_strong):
+                elif bearish_score >= min_score_required and bearish_score > bullish_score:
                     signal = 'SELL'
-                    confidence_reasons.append("EMA trend bearish")
-                    confidence_reasons.append("MACD bearish crossover (konfirmasi kuat)")
-                    confidence_reasons.append("RSI di bawah 50 (momentum bearish)")
+                    if ema_trend_bearish:
+                        confidence_reasons.append("EMA trend bearish")
+                    if macd_bearish_crossover:
+                        confidence_reasons.append("MACD bearish crossover (konfirmasi kuat)")
+                    elif macd_bearish:
+                        confidence_reasons.append("MACD bearish")
+                    if rsi_overbought_crossdown:
+                        confidence_reasons.append("RSI keluar dari overbought")
+                    elif rsi_bearish:
+                        confidence_reasons.append("RSI di bawah 50 (momentum bearish)")
                     if stoch_bearish:
                         confidence_reasons.append("Stochastic konfirmasi bearish")
                     if volume_strong:
                         confidence_reasons.append("Volume tinggi konfirmasi")
+                    confidence_reasons.append(f"Signal score: {bearish_score}/{bullish_score}")
             else:
                 ema_condition_bullish = ema_trend_bullish or ema_crossover_bullish
                 ema_condition_bearish = ema_trend_bearish or ema_crossover_bearish

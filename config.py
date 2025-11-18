@@ -75,12 +75,23 @@ class Config:
             ConfigValidationError: If critical configuration is missing or invalid
         """
         errors = []
+        warnings = []
         
         if not cls.TELEGRAM_BOT_TOKEN or cls.TELEGRAM_BOT_TOKEN.strip() == '':
             errors.append("TELEGRAM_BOT_TOKEN is required but not set")
         
         if not cls.AUTHORIZED_USER_IDS or len(cls.AUTHORIZED_USER_IDS) == 0:
             errors.append("AUTHORIZED_USER_IDS must contain at least one user ID")
+        
+        if cls.TELEGRAM_WEBHOOK_MODE:
+            if not cls.WEBHOOK_URL or cls.WEBHOOK_URL.strip() == '':
+                warnings.append("TELEGRAM_WEBHOOK_MODE is enabled but WEBHOOK_URL is not set - will attempt auto-detection")
+            else:
+                webhook_url = cls.WEBHOOK_URL.strip()
+                if not (webhook_url.startswith('http://') or webhook_url.startswith('https://')):
+                    errors.append(f"WEBHOOK_URL must start with http:// or https://, got: {webhook_url[:30]}...")
+                if not webhook_url.endswith('/webhook'):
+                    warnings.append("WEBHOOK_URL should typically end with '/webhook' endpoint")
         
         if cls.RISK_PER_TRADE_PERCENT <= 0 or cls.RISK_PER_TRADE_PERCENT > 100:
             errors.append(f"RISK_PER_TRADE_PERCENT must be between 0 and 100, got {cls.RISK_PER_TRADE_PERCENT}")
@@ -93,6 +104,12 @@ class Config:
         
         if cls.TP_RR_RATIO <= 0:
             errors.append(f"TP_RR_RATIO must be positive, got {cls.TP_RR_RATIO}")
+        
+        if warnings:
+            from bot.logger import setup_logger
+            logger = setup_logger('Config')
+            for warning in warnings:
+                logger.warning(f"Configuration warning: {warning}")
         
         if errors:
             raise ConfigValidationError("Configuration validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
