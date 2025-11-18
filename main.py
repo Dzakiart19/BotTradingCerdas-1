@@ -164,9 +164,7 @@ class TradingBotOrchestrator:
             
             logger.info("Starting position tracker...")
             position_task = asyncio.create_task(
-                self.position_tracker.monitor_positions(
-                    self.market_data.get_current_price
-                )
+                self.position_tracker.monitor_positions(self.market_data)
             )
             
             logger.info("Starting Telegram bot...")
