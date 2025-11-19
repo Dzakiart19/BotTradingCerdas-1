@@ -696,6 +696,44 @@ class TradingBot:
             return
         
         try:
+            logger.info("=" * 60)
+            logger.info("STARTING COMPLETE SYSTEM RESET")
+            logger.info("=" * 60)
+            
+            monitoring_count = len(self.monitoring_chats)
+            active_tasks = len(self.monitoring_tasks)
+            
+            logger.info("Stopping all monitoring...")
+            self.monitoring = False
+            self.monitoring_chats.clear()
+            
+            logger.info(f"Cancelling {active_tasks} monitoring tasks...")
+            for task in self.monitoring_tasks:
+                if not task.done():
+                    task.cancel()
+            
+            if self.monitoring_tasks:
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*self.monitoring_tasks, return_exceptions=True),
+                        timeout=5
+                    )
+                    logger.info("All monitoring tasks cancelled")
+                except asyncio.TimeoutError:
+                    logger.warning("Some monitoring tasks did not complete within timeout")
+            
+            self.monitoring_tasks.clear()
+            
+            if self.position_tracker:
+                logger.info("Clearing active positions from memory...")
+                active_pos_count = sum(len(positions) for positions in self.position_tracker.active_positions.values())
+                self.position_tracker.active_positions.clear()
+                self.position_tracker.stop_monitoring()
+                logger.info(f"Cleared {active_pos_count} positions from tracker")
+            else:
+                active_pos_count = 0
+            
+            logger.info("Clearing database records...")
             session = self.db.get_session()
             
             deleted_trades = session.query(Trade).delete()
@@ -705,19 +743,30 @@ class TradingBot:
             session.commit()
             session.close()
             
+            logger.info("=" * 60)
+            logger.info("SYSTEM RESET COMPLETE")
+            logger.info("=" * 60)
+            
             msg = (
-                "✅ *Database Reset Berhasil*\n\n"
-                f"Trades dihapus: {deleted_trades}\n"
-                f"Positions dihapus: {deleted_positions}\n"
-                f"Performance dihapus: {deleted_performance}\n"
+                "✅ *Reset Sistem Berhasil - Semua Dibersihkan!*\n\n"
+                "*Database:*\n"
+                f"• Trades dihapus: {deleted_trades}\n"
+                f"• Positions dihapus: {deleted_positions}\n"
+                f"• Performance dihapus: {deleted_performance}\n\n"
+                "*Monitoring & Sinyal:*\n"
+                f"• Monitoring dihentikan: {monitoring_count} chat\n"
+                f"• Task dibatalkan: {active_tasks}\n"
+                f"• Posisi aktif dihapus: {active_pos_count}\n\n"
+                "✨ *Sistem sekarang bersih dan siap digunakan lagi!*\n"
+                "Gunakan /monitor untuk mulai monitoring baru."
             )
             
             await update.message.reply_text(msg, parse_mode='Markdown')
-            logger.info(f"Database reset by admin {mask_user_id(update.effective_user.id)}")
+            logger.info(f"Complete system reset by admin {mask_user_id(update.effective_user.id)}")
             
         except Exception as e:
-            logger.error(f"Error resetting database: {e}")
-            await update.message.reply_text("❌ Error reset database.")
+            logger.error(f"Error resetting system: {e}")
+            await update.message.reply_text("❌ Error reset sistem. Cek logs untuk detail.")
     
     async def addpremium_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_admin(update.effective_user.id):

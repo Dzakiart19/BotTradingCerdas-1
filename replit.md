@@ -63,7 +63,50 @@ The bot's architecture is modular, designed for scalability and maintainability.
 -   **Free Tier Optimization (Nov 2025):** Optimized untuk Koyeb free tier dengan FREE_TIER_MODE, tick logging sampling (30x reduction), single-threaded chart generation, dan periodic garbage collection untuk reduce CPU/memory usage.
 
 ## Recent Changes (November 19, 2025)
-**V2.8 - Critical Tkinter Crash Fix untuk 24/7 Stability** (Latest)
+**V2.9 - Enhanced Reset, Limited Mode & Koyeb Stability** (Latest)
+
+1. ✅ **Complete System Reset Fix** (bot/telegram_bot.py):
+   - `/riset` command sekarang BENAR-BENAR membersihkan semua yang aktif
+   - Stop semua monitoring yang sedang berjalan (monitoring_chats cleared)
+   - Cancel semua monitoring tasks dengan proper timeout (5s)
+   - Clear active positions dari memory (position_tracker.active_positions)
+   - Stop position monitoring
+   - Hapus semua database records (trades, positions, performance)
+   - Response message detail menampilkan berapa banyak item yang dihapus
+   - Logging lengkap untuk audit trail
+
+2. ✅ **Limited Mode untuk Graceful Degradation** (main.py):
+   - Bot TIDAK crash lagi saat konfigurasi kurang lengkap
+   - Jika TELEGRAM_BOT_TOKEN atau AUTHORIZED_USER_IDS tidak ada, bot tetap jalan dalam "limited mode"
+   - Limited mode menyediakan health check endpoint untuk keep Koyeb service healthy
+   - Clear warning messages tentang environment variables yang missing
+   - Instruksi lengkap cara set environment variables untuk enable full functionality
+   - Bot siap untuk switch ke full mode setelah config diset dan restart
+
+3. ✅ **Enhanced Health Check** (main.py):
+   - Health check response sekarang include `mode` (full/limited)
+   - Include `config_valid` flag (true/false)
+   - Include `missing_config` array yang list environment variables yang kurang
+   - Include `message` yang informatif tentang status bot
+   - Status bisa: "healthy" (full mode running), "limited" (missing config), atau "stopped"
+   - Koyeb bisa monitor bot dengan lebih akurat
+
+4. ✅ **Better Configuration Validation** (main.py):
+   - Validation errors sekarang jadi warnings (tidak crash)
+   - Config validation issues di-log dengan jelas
+   - Bot tetap initialize components (database, etc) meskipun config kurang lengkap
+   - Graceful fallback untuk setiap missing configuration item
+
+**Impact:** 
+- ✅ Bot TIDAK shutdown lagi di Koyeb meskipun konfigurasi kurang lengkap
+- ✅ Perintah `/riset` sekarang benar-benar membersihkan SEMUA yang aktif (no ghost signals!)
+- ✅ Health check memberikan informasi lengkap untuk troubleshooting
+- ✅ User mendapat instruksi jelas tentang apa yang perlu diset untuk enable full functionality
+- ✅ Koyeb service tetap "healthy" meskipun bot dalam limited mode
+
+---
+
+**V2.8 - Critical Tkinter Crash Fix untuk 24/7 Stability**
 
 1. ✅ **Matplotlib Backend Fix** (bot/chart_generator.py):
    - Set `matplotlib.use('Agg')` sebelum import mplfinance

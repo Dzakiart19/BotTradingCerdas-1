@@ -25,14 +25,18 @@ logger = setup_logger('Main')
 class TradingBotOrchestrator:
     def __init__(self):
         self.config = Config()
+        self.config_valid = False
         
         logger.info("Validating configuration...")
         try:
             self.config.validate()
-            logger.info("Configuration validated successfully")
+            logger.info("✅ Configuration validated successfully")
+            self.config_valid = True
         except Exception as e:
-            logger.error(f"Configuration validation failed: {e}")
-            raise
+            logger.warning(f"⚠️ Configuration validation issues: {e}")
+            logger.warning("Bot will start in limited mode - health check will be available")
+            logger.warning("Set missing environment variables and restart to enable full functionality")
+            self.config_valid = False
         
         self.running = False
         self.shutdown_in_progress = False
@@ -40,10 +44,25 @@ class TradingBotOrchestrator:
         self.health_server = None
         self.tracked_tasks = []
         
-        logger.info("Initializing Trading Bot components...")
-        
         self.db_manager = DatabaseManager(self.config.DATABASE_PATH)
         logger.info("Database initialized")
+        
+        if not self.config_valid:
+            logger.warning("Skipping full component initialization - running in limited mode")
+            self.error_handler = None
+            self.user_manager = None
+            self.market_data = None
+            self.strategy = None
+            self.risk_manager = None
+            self.chart_generator = None
+            self.alert_system = None
+            self.position_tracker = None
+            self.telegram_bot = None
+            self.task_scheduler = None
+            logger.info("Limited mode: Only database and health server will be initialized")
+            return
+        
+        logger.info("Initializing Trading Bot components...")
         
         self.error_handler = ErrorHandler(self.config)
         logger.info("Error handler initialized")
@@ -160,7 +179,13 @@ class TradingBotOrchestrator:
     async def start_health_server(self):
         try:
             async def health_check(request):
-                market_status = self.market_data.get_status()
+                missing_config = []
+                if not self.config.TELEGRAM_BOT_TOKEN:
+                    missing_config.append('TELEGRAM_BOT_TOKEN')
+                if not self.config.AUTHORIZED_USER_IDS:
+                    missing_config.append('AUTHORIZED_USER_IDS')
+                
+                market_status = 'not_initialized' if not self.config_valid else (self.market_data.get_status() if self.market_data else 'not_initialized')
                 
                 db_status = 'unknown'
                 try:
@@ -173,16 +198,25 @@ class TradingBotOrchestrator:
                     db_status = f'error: {str(e)[:50]}'
                     logger.error(f"Database health check failed: {e}")
                 
+                mode = 'full' if self.config_valid else 'limited'
+                overall_status = 'healthy' if self.config_valid and self.running else 'limited' if not self.config_valid else 'stopped'
+                
                 health_status = {
-                    'status': 'healthy' if self.running else 'stopped',
+                    'status': overall_status,
+                    'mode': mode,
+                    'config_valid': self.config_valid,
+                    'missing_config': missing_config,
                     'market_data': market_status,
-                    'telegram_bot': 'running' if self.telegram_bot.app else 'stopped',
-                    'scheduler': 'running' if self.task_scheduler.running else 'stopped',
+                    'telegram_bot': 'running' if self.config_valid and self.telegram_bot and self.telegram_bot.app else 'not_initialized',
+                    'scheduler': 'running' if self.config_valid and self.task_scheduler and self.task_scheduler.running else 'not_initialized',
                     'database': db_status,
-                    'webhook_mode': self.config.TELEGRAM_WEBHOOK_MODE
+                    'webhook_mode': self.config.TELEGRAM_WEBHOOK_MODE if self.config_valid else False,
+                    'message': 'Bot running in limited mode - set missing environment variables to enable full functionality' if not self.config_valid else 'Bot running normally'
                 }
                 
-                return web.json_response(health_status)
+                status_code = 200 if self.config_valid and self.running else 503
+                
+                return web.json_response(health_status, status=status_code)
             
             async def telegram_webhook(request):
                 if not self.config.TELEGRAM_WEBHOOK_MODE:
@@ -211,8 +245,13 @@ class TradingBotOrchestrator:
             app.router.add_get('/health', health_check)
             app.router.add_get('/', health_check)
             
-            webhook_path = f"/bot{self.config.TELEGRAM_BOT_TOKEN}"
-            app.router.add_post(webhook_path, telegram_webhook)
+            webhook_path = None
+            if self.config_valid and self.config.TELEGRAM_BOT_TOKEN:
+                webhook_path = f"/bot{self.config.TELEGRAM_BOT_TOKEN}"
+                app.router.add_post(webhook_path, telegram_webhook)
+                logger.info(f"Webhook route registered: {webhook_path}")
+            else:
+                logger.info("Webhook route not registered - limited mode or missing bot token")
             
             runner = web.AppRunner(app)
             await runner.setup()
@@ -222,13 +261,19 @@ class TradingBotOrchestrator:
             
             self.health_server = runner
             logger.info(f"Health check server started on port {self.config.HEALTH_CHECK_PORT}")
-            if self.config.TELEGRAM_WEBHOOK_MODE:
+            if self.config.TELEGRAM_WEBHOOK_MODE and webhook_path:
                 logger.info(f"Webhook endpoint available at: http://0.0.0.0:{self.config.HEALTH_CHECK_PORT}{webhook_path}")
+            elif self.config.TELEGRAM_WEBHOOK_MODE:
+                logger.info("Webhook mode enabled but endpoint not available (limited mode)")
             
         except Exception as e:
             logger.error(f"Failed to start health server: {e}")
     
     async def setup_scheduled_tasks(self):
+        if not self.config_valid or not self.task_scheduler:
+            logger.warning("Skipping scheduled tasks setup - limited mode or scheduler not initialized")
+            return
+            
         bot_components = {
             'chart_generator': self.chart_generator,
             'alert_system': self.alert_system,
@@ -245,6 +290,7 @@ class TradingBotOrchestrator:
         logger.info("XAUUSD TRADING BOT STARTING")
         logger.info("=" * 60)
         logger.info(f"Mode: {'DRY RUN (Simulation)' if self.config.DRY_RUN else 'LIVE'}")
+        logger.info(f"Config Valid: {'YES ✅' if self.config_valid else 'NO ⚠️ (Limited Mode)'}")
         
         if self.config.TELEGRAM_BOT_TOKEN:
             logger.info(f"Telegram Bot Token: Configured ({self.config.get_masked_token()})")
@@ -252,7 +298,7 @@ class TradingBotOrchestrator:
             if ':' in self.config.TELEGRAM_BOT_TOKEN and len(self.config.TELEGRAM_BOT_TOKEN) > 40:
                 logger.warning("⚠️ Bot token detected - ensure it's never logged in plain text")
         else:
-            logger.info("Telegram Bot Token: NOT CONFIGURED")
+            logger.warning("Telegram Bot Token: NOT CONFIGURED ⚠️")
         
         logger.info(f"Authorized Users: {len(self.config.AUTHORIZED_USER_IDS)}")
         
@@ -266,9 +312,30 @@ class TradingBotOrchestrator:
         
         logger.info("=" * 60)
         
-        if not self.config.TELEGRAM_BOT_TOKEN:
-            logger.error("TELEGRAM_BOT_TOKEN not configured! Bot cannot start.")
-            logger.error("Please set TELEGRAM_BOT_TOKEN environment variable.")
+        if not self.config_valid:
+            logger.warning("=" * 60)
+            logger.warning("RUNNING IN LIMITED MODE")
+            logger.warning("=" * 60)
+            logger.warning("Bot functionality will be limited due to missing configuration.")
+            logger.warning("")
+            logger.warning("To enable full functionality, set these environment variables:")
+            if not self.config.TELEGRAM_BOT_TOKEN:
+                logger.warning("  - TELEGRAM_BOT_TOKEN (get from @BotFather on Telegram)")
+            if not self.config.AUTHORIZED_USER_IDS:
+                logger.warning("  - AUTHORIZED_USER_IDS (your Telegram user ID)")
+            logger.warning("")
+            logger.warning("Health check endpoint will remain available at /health")
+            logger.warning("=" * 60)
+            
+            logger.info("Starting health check server only...")
+            await self.start_health_server()
+            
+            logger.info("=" * 60)
+            logger.info("BOT RUNNING IN LIMITED MODE - HEALTH CHECK AVAILABLE")
+            logger.info("=" * 60)
+            logger.info("Set environment variables and restart to enable trading functionality")
+            
+            await self.shutdown_event.wait()
             return
         
         self.running = True
