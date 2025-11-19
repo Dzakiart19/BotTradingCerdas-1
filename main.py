@@ -355,8 +355,15 @@ class TradingBotOrchestrator:
                     "Gunakan /help untuk list command"
                 )
                 
+                valid_user_ids = []
                 for user_id in self.config.AUTHORIZED_USER_IDS:
                     try:
+                        chat_info = await self.telegram_bot.app.bot.get_chat(user_id)
+                        if chat_info.type == 'bot':
+                            logger.warning(f"Skipping bot ID {user_id} - cannot send messages to bots")
+                            continue
+                        
+                        valid_user_ids.append(user_id)
                         await self.telegram_bot.app.bot.send_message(
                             chat_id=user_id,
                             text=startup_msg,
@@ -365,12 +372,20 @@ class TradingBotOrchestrator:
                         logger.debug(f"Startup message sent successfully to user {user_id}")
                     except Exception as telegram_error:
                         error_type = type(telegram_error).__name__
-                        logger.error(f"Failed to send startup message to user {user_id}: [{error_type}] {telegram_error}")
-                        if self.error_handler:
-                            self.error_handler.log_exception(telegram_error, f"startup_message_user_{user_id}")
+                        error_msg = str(telegram_error).lower()
+                        
+                        if 'bot' in error_msg and 'forbidden' in error_msg:
+                            logger.warning(f"Skipping bot ID {user_id} - Telegram bots cannot receive messages")
+                        else:
+                            logger.error(f"Failed to send startup message to user {user_id}: [{error_type}] {telegram_error}")
+                            if self.error_handler:
+                                self.error_handler.log_exception(telegram_error, f"startup_message_user_{user_id}")
                 
-                logger.info("Auto-starting monitoring for authorized users...")
-                await self.telegram_bot.auto_start_monitoring(self.config.AUTHORIZED_USER_IDS)
+                if valid_user_ids:
+                    logger.info(f"Auto-starting monitoring for {len(valid_user_ids)} valid users...")
+                    await self.telegram_bot.auto_start_monitoring(valid_user_ids)
+                else:
+                    logger.warning("No valid user IDs found - all IDs are either bots or invalid")
             
             logger.info("=" * 60)
             logger.info("BOT IS NOW RUNNING")
@@ -419,7 +434,9 @@ class TradingBotOrchestrator:
                                     parse_mode='Markdown'
                                 )
                             except Exception as e:
-                                logger.error(f"Failed to send shutdown message: {e}")
+                                error_msg = str(e).lower()
+                                if 'bot' not in error_msg or 'forbidden' not in error_msg:
+                                    logger.error(f"Failed to send shutdown message: {e}")
                     
                     await asyncio.wait_for(send_shutdown_messages(), timeout=5)
                 except asyncio.TimeoutError:
