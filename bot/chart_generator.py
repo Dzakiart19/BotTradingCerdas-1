@@ -1,5 +1,7 @@
 import os
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
 import mplfinance as mpf
 from datetime import datetime
 from typing import Optional

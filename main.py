@@ -422,29 +422,6 @@ class TradingBotOrchestrator:
         shutdown_start_time = loop.time()
         
         try:
-            if self.telegram_bot and self.telegram_bot.app and self.config.AUTHORIZED_USER_IDS:
-                try:
-                    shutdown_msg = "🛑 *Bot Shutting Down*\n\nBot is being stopped."
-                    
-                    async def send_shutdown_messages():
-                        for user_id in self.config.AUTHORIZED_USER_IDS:
-                            try:
-                                await self.telegram_bot.app.bot.send_message(
-                                    chat_id=user_id,
-                                    text=shutdown_msg,
-                                    parse_mode='Markdown'
-                                )
-                            except Exception as e:
-                                error_msg = str(e).lower()
-                                if 'bot' not in error_msg or 'forbidden' not in error_msg:
-                                    logger.error(f"Failed to send shutdown message: {e}")
-                    
-                    await asyncio.wait_for(send_shutdown_messages(), timeout=5)
-                except asyncio.TimeoutError:
-                    logger.warning(f"Sending shutdown messages timed out after 5s")
-                except Exception as e:
-                    logger.error(f"Error sending shutdown messages: {e}")
-            
             logger.info("Cancelling tracked async tasks...")
             cancelled_count = 0
             for task in self.tracked_tasks:
