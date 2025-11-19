@@ -90,8 +90,8 @@ class Config:
                 webhook_url = cls.WEBHOOK_URL.strip()
                 if not (webhook_url.startswith('http://') or webhook_url.startswith('https://')):
                     errors.append(f"WEBHOOK_URL must start with http:// or https://, got: {webhook_url[:30]}...")
-                if not webhook_url.endswith('/webhook'):
-                    warnings.append("WEBHOOK_URL should typically end with '/webhook' endpoint")
+                if not ('/bot' in webhook_url):
+                    warnings.append("WEBHOOK_URL should typically contain '/bot<token>' endpoint for Telegram webhooks")
         
         if cls.RISK_PER_TRADE_PERCENT <= 0 or cls.RISK_PER_TRADE_PERCENT > 100:
             errors.append(f"RISK_PER_TRADE_PERCENT must be between 0 and 100, got {cls.RISK_PER_TRADE_PERCENT}")

@@ -146,7 +146,8 @@ class TradingBotOrchestrator:
                 logger.error(f"Domain validation error: {e}")
                 return None
             
-            webhook_url = f"https://{domain}/webhook"
+            bot_token = self.config.TELEGRAM_BOT_TOKEN
+            webhook_url = f"https://{domain}/bot{bot_token}"
             
             logger.info(f"✅ Auto-constructed webhook URL: {webhook_url}")
             return webhook_url
@@ -207,7 +208,9 @@ class TradingBotOrchestrator:
             app = web.Application()
             app.router.add_get('/health', health_check)
             app.router.add_get('/', health_check)
-            app.router.add_post('/webhook', telegram_webhook)
+            
+            webhook_path = f"/bot{self.config.TELEGRAM_BOT_TOKEN}"
+            app.router.add_post(webhook_path, telegram_webhook)
             
             runner = web.AppRunner(app)
             await runner.setup()
@@ -218,7 +221,7 @@ class TradingBotOrchestrator:
             self.health_server = runner
             logger.info(f"Health check server started on port {self.config.HEALTH_CHECK_PORT}")
             if self.config.TELEGRAM_WEBHOOK_MODE:
-                logger.info(f"Webhook endpoint available at: http://0.0.0.0:{self.config.HEALTH_CHECK_PORT}/webhook")
+                logger.info(f"Webhook endpoint available at: http://0.0.0.0:{self.config.HEALTH_CHECK_PORT}{webhook_path}")
             
         except Exception as e:
             logger.error(f"Failed to start health server: {e}")
@@ -228,7 +231,8 @@ class TradingBotOrchestrator:
             'chart_generator': self.chart_generator,
             'alert_system': self.alert_system,
             'db_manager': self.db_manager,
-            'market_data': self.market_data
+            'market_data': self.market_data,
+            'position_tracker': self.position_tracker
         }
         
         setup_default_tasks(self.task_scheduler, bot_components)

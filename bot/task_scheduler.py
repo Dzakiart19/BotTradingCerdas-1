@@ -270,6 +270,13 @@ def setup_default_tasks(scheduler: TaskScheduler, bot_components: Dict):
             else:
                 logger.warning("Health check: No price data available")
     
+    async def monitor_positions():
+        position_tracker = bot_components.get('position_tracker')
+        if position_tracker:
+            updated = await position_tracker.monitor_active_positions()
+            if updated:
+                logger.info(f"Position monitoring: {len(updated)} positions updated")
+    
     scheduler.add_interval_task(
         'cleanup_charts',
         cleanup_old_charts,
@@ -294,6 +301,12 @@ def setup_default_tasks(scheduler: TaskScheduler, bot_components: Dict):
         'health_check',
         health_check,
         interval_seconds=300
+    )
+    
+    scheduler.add_interval_task(
+        'monitor_positions',
+        monitor_positions,
+        interval_seconds=10
     )
     
     logger.info("Default tasks setup completed")

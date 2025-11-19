@@ -419,6 +419,88 @@ class TradingBot:
             logger.error(f"Error calculating performance: {e}")
             await update.message.reply_text("❌ Error menghitung performa.")
     
+    async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show active positions with dynamic SL/TP tracking info"""
+        if not self.is_authorized(update.effective_user.id):
+            return
+        
+        user_id = update.effective_user.id
+        
+        try:
+            if not self.position_tracker:
+                await update.message.reply_text("❌ Position tracker tidak tersedia.")
+                return
+            
+            active_positions = self.position_tracker.get_active_positions(user_id)
+            
+            if not active_positions:
+                await update.message.reply_text(
+                    "📊 *Position Status*\n\n"
+                    "Tidak ada posisi aktif saat ini.\n"
+                    "Gunakan /getsignal untuk membuat sinyal baru.",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            session = self.db.get_session()
+            
+            msg = f"📊 *Active Positions* ({len(active_positions)})\n\n"
+            
+            for pos_id, pos_data in active_positions.items():
+                position_db = session.query(Position).filter(
+                    Position.id == pos_id,
+                    Position.user_id == user_id
+                ).first()
+                
+                if not position_db:
+                    continue
+                
+                signal_type = pos_data['signal_type']
+                entry_price = pos_data['entry_price']
+                current_sl = pos_data['stop_loss']
+                original_sl = pos_data.get('original_sl', current_sl)
+                take_profit = pos_data['take_profit']
+                sl_count = pos_data.get('sl_adjustment_count', 0)
+                max_profit = pos_data.get('max_profit_reached', 0.0)
+                
+                unrealized_pl = position_db.unrealized_pl or 0.0
+                current_price = position_db.current_price or entry_price
+                
+                pl_emoji = "🟢" if unrealized_pl > 0 else "🔴" if unrealized_pl < 0 else "⚪"
+                
+                msg += f"*Position #{pos_id}* - {signal_type} {pl_emoji}\n"
+                msg += f"Entry: ${entry_price:.2f}\n"
+                msg += f"Current: ${current_price:.2f}\n"
+                msg += f"P/L: ${unrealized_pl:.2f}\n\n"
+                
+                msg += f"*Take Profit:* ${take_profit:.2f}\n"
+                
+                if sl_count > 0:
+                    msg += f"*Original SL:* ${original_sl:.2f}\n"
+                    msg += f"*Current SL:* ${current_sl:.2f} ✅\n"
+                    msg += f"*SL Adjusted:* {sl_count}x\n"
+                else:
+                    msg += f"*Stop Loss:* ${current_sl:.2f}\n"
+                
+                if max_profit > 0:
+                    msg += f"*Max Profit:* ${max_profit:.2f}\n"
+                    if unrealized_pl >= self.config.TRAILING_STOP_PROFIT_THRESHOLD:
+                        msg += f"*Trailing Stop:* Active 💎\n"
+                
+                if position_db.last_price_update:
+                    jakarta_tz = pytz.timezone('Asia/Jakarta')
+                    last_update = position_db.last_price_update.replace(tzinfo=pytz.UTC).astimezone(jakarta_tz)
+                    msg += f"Last Update: {last_update.strftime('%H:%M:%S')}\n"
+                
+                msg += "\n"
+            
+            session.close()
+            await update.message.reply_text(msg, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Error fetching position status: {e}")
+            await update.message.reply_text("❌ Error mengambil status posisi.")
+    
     async def getsignal_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_authorized(update.effective_user.id):
             return
@@ -709,6 +791,7 @@ class TradingBot:
         self.app.add_handler(CommandHandler("monitor", self.monitor_command))
         self.app.add_handler(CommandHandler("stopmonitor", self.stopmonitor_command))
         self.app.add_handler(CommandHandler("getsignal", self.getsignal_command))
+        self.app.add_handler(CommandHandler("status", self.status_command))
         self.app.add_handler(CommandHandler("riwayat", self.riwayat_command))
         self.app.add_handler(CommandHandler("performa", self.performa_command))
         self.app.add_handler(CommandHandler("settings", self.settings_command))

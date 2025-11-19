@@ -20,6 +20,18 @@ class PositionTracker:
         self.telegram_app = telegram_app
         self.active_positions = {}
         self.monitoring = False
+    
+    def _normalize_position_dict(self, pos: Dict) -> Dict:
+        """Ensure all required keys exist in position dict with safe defaults"""
+        if 'original_sl' not in pos or pos['original_sl'] is None:
+            pos['original_sl'] = pos.get('stop_loss', 0.0)
+        if 'sl_adjustment_count' not in pos or pos['sl_adjustment_count'] is None:
+            pos['sl_adjustment_count'] = 0
+        if 'max_profit_reached' not in pos or pos['max_profit_reached'] is None:
+            pos['max_profit_reached'] = 0.0
+        if 'last_price_update' not in pos:
+            pos['last_price_update'] = datetime.now(pytz.UTC)
+        return pos
         
     async def add_position(self, user_id: int, trade_id: int, signal_type: str, entry_price: float,
                           stop_loss: float, take_profit: float):
@@ -35,7 +47,11 @@ class PositionTracker:
                 take_profit=take_profit,
                 current_price=entry_price,
                 unrealized_pl=0.0,
-                status='ACTIVE'
+                status='ACTIVE',
+                original_sl=stop_loss,
+                sl_adjustment_count=0,
+                max_profit_reached=0.0,
+                last_price_update=datetime.now(pytz.UTC)
             )
             session.add(position)
             session.commit()
@@ -48,7 +64,10 @@ class PositionTracker:
                 'signal_type': signal_type,
                 'entry_price': entry_price,
                 'stop_loss': stop_loss,
-                'take_profit': take_profit
+                'take_profit': take_profit,
+                'original_sl': stop_loss,
+                'sl_adjustment_count': 0,
+                'max_profit_reached': 0.0
             }
             
             logger.info(f"Position added - User:{user_id} ID:{position.id} {signal_type} @${entry_price:.2f}")
@@ -61,7 +80,157 @@ class PositionTracker:
         finally:
             session.close()
     
+    async def apply_dynamic_sl(self, user_id: int, position_id: int, current_price: float, unrealized_pl: float) -> tuple[bool, Optional[float]]:
+        """Apply dynamic SL tightening when loss >= threshold
+        
+        Returns:
+            tuple[bool, Optional[float]]: (sl_adjusted, new_stop_loss)
+        """
+        if user_id not in self.active_positions or position_id not in self.active_positions[user_id]:
+            return False, None
+        
+        pos = self._normalize_position_dict(self.active_positions[user_id][position_id])
+        signal_type = pos['signal_type']
+        entry_price = pos['entry_price']
+        stop_loss = pos['stop_loss']
+        original_sl = pos.get('original_sl')
+        
+        if original_sl is None:
+            original_sl = stop_loss
+            pos['original_sl'] = stop_loss
+            logger.warning(f"original_sl was None for position {position_id}, using current stop_loss")
+        
+        if unrealized_pl >= 0 or abs(unrealized_pl) < self.config.DYNAMIC_SL_LOSS_THRESHOLD:
+            return False, None
+        
+        original_sl_distance = abs(entry_price - original_sl)
+        new_sl_distance = original_sl_distance * self.config.DYNAMIC_SL_TIGHTENING_MULTIPLIER
+        
+        new_stop_loss = None
+        sl_adjusted = False
+        
+        if signal_type == 'BUY':
+            new_stop_loss = entry_price - new_sl_distance
+            if new_stop_loss > stop_loss:
+                pos['stop_loss'] = new_stop_loss
+                pos['sl_adjustment_count'] = pos.get('sl_adjustment_count', 0) + 1
+                sl_adjusted = True
+                logger.info(f"🛡️ Dynamic SL activated! Loss ${abs(unrealized_pl):.2f} >= ${self.config.DYNAMIC_SL_LOSS_THRESHOLD}. SL tightened from ${stop_loss:.2f} → ${new_stop_loss:.2f} (protect capital)")
+                
+                if self.telegram_app:
+                    try:
+                        msg = (
+                            f"🛡️ *Dynamic SL Activated*\n\n"
+                            f"Position ID: {position_id}\n"
+                            f"Type: {signal_type}\n"
+                            f"Current Loss: ${abs(unrealized_pl):.2f}\n"
+                            f"SL Updated: ${stop_loss:.2f} → ${new_stop_loss:.2f}\n"
+                            f"Protection: Capital preservation mode"
+                        )
+                        await self.telegram_app.bot.send_message(chat_id=user_id, text=msg, parse_mode='Markdown')
+                    except Exception as e:
+                        logger.error(f"Failed to send dynamic SL notification: {e}")
+        else:
+            new_stop_loss = entry_price + new_sl_distance
+            if new_stop_loss < stop_loss:
+                pos['stop_loss'] = new_stop_loss
+                pos['sl_adjustment_count'] = pos.get('sl_adjustment_count', 0) + 1
+                sl_adjusted = True
+                logger.info(f"🛡️ Dynamic SL activated! Loss ${abs(unrealized_pl):.2f} >= ${self.config.DYNAMIC_SL_LOSS_THRESHOLD}. SL tightened from ${stop_loss:.2f} → ${new_stop_loss:.2f} (protect capital)")
+                
+                if self.telegram_app:
+                    try:
+                        msg = (
+                            f"🛡️ *Dynamic SL Activated*\n\n"
+                            f"Position ID: {position_id}\n"
+                            f"Type: {signal_type}\n"
+                            f"Current Loss: ${abs(unrealized_pl):.2f}\n"
+                            f"SL Updated: ${stop_loss:.2f} → ${new_stop_loss:.2f}\n"
+                            f"Protection: Capital preservation mode"
+                        )
+                        await self.telegram_app.bot.send_message(chat_id=user_id, text=msg, parse_mode='Markdown')
+                    except Exception as e:
+                        logger.error(f"Failed to send dynamic SL notification: {e}")
+        
+        return sl_adjusted, new_stop_loss if sl_adjusted else None
+    
+    async def apply_trailing_stop(self, user_id: int, position_id: int, current_price: float, unrealized_pl: float) -> tuple[bool, Optional[float]]:
+        """Apply trailing stop when profit >= threshold
+        
+        Returns:
+            tuple[bool, Optional[float]]: (sl_adjusted, new_stop_loss)
+        """
+        if user_id not in self.active_positions or position_id not in self.active_positions[user_id]:
+            return False, None
+        
+        pos = self._normalize_position_dict(self.active_positions[user_id][position_id])
+        signal_type = pos['signal_type']
+        stop_loss = pos['stop_loss']
+        
+        if unrealized_pl <= 0 or unrealized_pl < self.config.TRAILING_STOP_PROFIT_THRESHOLD:
+            return False, None
+        
+        max_profit = pos.get('max_profit_reached', 0.0)
+        if max_profit is None:
+            max_profit = 0.0
+        
+        if unrealized_pl > max_profit:
+            pos['max_profit_reached'] = unrealized_pl
+        
+        trailing_distance = self.config.TRAILING_STOP_DISTANCE_PIPS / self.config.XAUUSD_PIP_VALUE
+        
+        new_trailing_sl = None
+        sl_adjusted = False
+        
+        if signal_type == 'BUY':
+            new_trailing_sl = current_price - trailing_distance
+            if new_trailing_sl > stop_loss:
+                pos['stop_loss'] = new_trailing_sl
+                pos['sl_adjustment_count'] = pos.get('sl_adjustment_count', 0) + 1
+                sl_adjusted = True
+                logger.info(f"💎 Trailing stop activated! Profit ${unrealized_pl:.2f}. SL moved to ${new_trailing_sl:.2f} (lock-in profit)")
+                
+                if self.telegram_app:
+                    try:
+                        msg = (
+                            f"💎 *Trailing Stop Active*\n\n"
+                            f"Position ID: {position_id}\n"
+                            f"Type: {signal_type}\n"
+                            f"Current Profit: ${unrealized_pl:.2f}\n"
+                            f"Max Profit: ${pos['max_profit_reached']:.2f}\n"
+                            f"SL Updated: ${stop_loss:.2f} → ${new_trailing_sl:.2f}\n"
+                            f"Status: Profit locked-in!"
+                        )
+                        await self.telegram_app.bot.send_message(chat_id=user_id, text=msg, parse_mode='Markdown')
+                    except Exception as e:
+                        logger.error(f"Failed to send trailing stop notification: {e}")
+        else:
+            new_trailing_sl = current_price + trailing_distance
+            if new_trailing_sl < stop_loss:
+                pos['stop_loss'] = new_trailing_sl
+                pos['sl_adjustment_count'] = pos.get('sl_adjustment_count', 0) + 1
+                sl_adjusted = True
+                logger.info(f"💎 Trailing stop activated! Profit ${unrealized_pl:.2f}. SL moved to ${new_trailing_sl:.2f} (lock-in profit)")
+                
+                if self.telegram_app:
+                    try:
+                        msg = (
+                            f"💎 *Trailing Stop Active*\n\n"
+                            f"Position ID: {position_id}\n"
+                            f"Type: {signal_type}\n"
+                            f"Current Profit: ${unrealized_pl:.2f}\n"
+                            f"Max Profit: ${pos['max_profit_reached']:.2f}\n"
+                            f"SL Updated: ${stop_loss:.2f} → ${new_trailing_sl:.2f}\n"
+                            f"Status: Profit locked-in!"
+                        )
+                        await self.telegram_app.bot.send_message(chat_id=user_id, text=msg, parse_mode='Markdown')
+                    except Exception as e:
+                        logger.error(f"Failed to send trailing stop notification: {e}")
+        
+        return sl_adjusted, new_trailing_sl if sl_adjusted else None
+    
     async def update_position(self, user_id: int, position_id: int, current_price: float) -> Optional[str]:
+        """Update position with current price and apply dynamic SL/TP logic"""
         if user_id not in self.active_positions or position_id not in self.active_positions[user_id]:
             return None
         
@@ -73,41 +242,18 @@ class PositionTracker:
         
         unrealized_pl = self.risk_manager.calculate_pl(entry_price, current_price, signal_type)
         
-        new_stop_loss = stop_loss
         sl_adjusted = False
         
-        if unrealized_pl < 0 and abs(unrealized_pl) >= self.config.DYNAMIC_SL_LOSS_THRESHOLD:
-            original_sl_distance = abs(entry_price - stop_loss)
-            new_sl_distance = original_sl_distance * self.config.DYNAMIC_SL_TIGHTENING_MULTIPLIER
-            
-            if signal_type == 'BUY':
-                new_stop_loss = entry_price - new_sl_distance
-                if new_stop_loss > stop_loss:
-                    pos['stop_loss'] = new_stop_loss
-                    sl_adjusted = True
-                    logger.info(f"🔴 Dynamic SL activated! Loss ${abs(unrealized_pl):.2f} >= ${self.config.DYNAMIC_SL_LOSS_THRESHOLD}. SL adjusted from ${stop_loss:.2f} to ${new_stop_loss:.2f}")
-            else:
-                new_stop_loss = entry_price + new_sl_distance
-                if new_stop_loss < stop_loss:
-                    pos['stop_loss'] = new_stop_loss
-                    sl_adjusted = True
-                    logger.info(f"🔴 Dynamic SL activated! Loss ${abs(unrealized_pl):.2f} >= ${self.config.DYNAMIC_SL_LOSS_THRESHOLD}. SL adjusted from ${stop_loss:.2f} to ${new_stop_loss:.2f}")
+        dynamic_sl_applied, new_sl = await self.apply_dynamic_sl(user_id, position_id, current_price, unrealized_pl)
+        if dynamic_sl_applied:
+            sl_adjusted = True
+            stop_loss = new_sl
         
-        elif unrealized_pl > 0 and unrealized_pl >= self.config.TRAILING_STOP_PROFIT_THRESHOLD:
-            trailing_distance = self.config.TRAILING_STOP_DISTANCE_PIPS / self.config.XAUUSD_PIP_VALUE
-            
-            if signal_type == 'BUY':
-                new_trailing_sl = current_price - trailing_distance
-                if new_trailing_sl > stop_loss:
-                    pos['stop_loss'] = new_trailing_sl
-                    sl_adjusted = True
-                    logger.info(f"🟢 Trailing stop activated! Profit ${unrealized_pl:.2f}. SL moved to ${new_trailing_sl:.2f}")
-            else:
-                new_trailing_sl = current_price + trailing_distance
-                if new_trailing_sl < stop_loss:
-                    pos['stop_loss'] = new_trailing_sl
-                    sl_adjusted = True
-                    logger.info(f"🟢 Trailing stop activated! Profit ${unrealized_pl:.2f}. SL moved to ${new_trailing_sl:.2f}")
+        if not dynamic_sl_applied:
+            trailing_applied, new_sl = await self.apply_trailing_stop(user_id, position_id, current_price, unrealized_pl)
+            if trailing_applied:
+                sl_adjusted = True
+                stop_loss = new_sl
         
         stop_loss = pos['stop_loss']
         
@@ -117,8 +263,16 @@ class PositionTracker:
             if position:
                 position.current_price = current_price
                 position.unrealized_pl = unrealized_pl
+                position.last_price_update = datetime.now(pytz.UTC)
+                
+                current_max_profit = position.max_profit_reached if position.max_profit_reached is not None else 0.0
+                if unrealized_pl > 0 and unrealized_pl > current_max_profit:
+                    position.max_profit_reached = unrealized_pl
+                
                 if sl_adjusted:
                     position.stop_loss = stop_loss
+                    position.sl_adjustment_count = pos['sl_adjustment_count']
+                
                 session.commit()
         except Exception as e:
             logger.error(f"Error updating position {position_id}: {e}")
@@ -265,6 +419,49 @@ class PositionTracker:
             session.rollback()
         finally:
             session.close()
+    
+    async def monitor_active_positions(self):
+        """Monitor all active positions and apply dynamic SL/TP
+        
+        This method is called by the scheduler every 10 seconds.
+        Returns a list of updated positions.
+        """
+        if not self.active_positions:
+            return []
+        
+        if not self.market_data:
+            logger.warning("Market data not available for position monitoring")
+            return []
+        
+        updated_positions = []
+        
+        try:
+            current_price = await self.market_data.get_current_price()
+            
+            if not current_price:
+                logger.warning("No current price available for position monitoring")
+                return []
+            
+            for user_id in list(self.active_positions.keys()):
+                for position_id in list(self.active_positions[user_id].keys()):
+                    try:
+                        result = await self.update_position(user_id, position_id, current_price)
+                        if result:
+                            updated_positions.append({
+                                'user_id': user_id,
+                                'position_id': position_id,
+                                'result': result,
+                                'price': current_price
+                            })
+                            logger.info(f"Position {position_id} User:{user_id} closed: {result} at ${current_price:.2f}")
+                    except Exception as e:
+                        logger.error(f"Error monitoring position {position_id} for user {user_id}: {e}")
+            
+            return updated_positions
+            
+        except Exception as e:
+            logger.error(f"Error in monitor_active_positions: {e}")
+            return []
     
     async def monitor_positions(self, market_data_client):
         tick_queue = await market_data_client.subscribe_ticks('position_tracker')

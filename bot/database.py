@@ -57,6 +57,10 @@ class Position(Base):
     status = Column(String(20), default='ACTIVE')
     opened_at = Column(DateTime, default=datetime.utcnow)
     closed_at = Column(DateTime)
+    original_sl = Column(Float)
+    sl_adjustment_count = Column(Integer, default=0)
+    max_profit_reached = Column(Float, default=0.0)
+    last_price_update = Column(DateTime)
 
 class Performance(Base):
     __tablename__ = 'performance'
@@ -133,6 +137,34 @@ class DatabaseManager:
                     conn.execute(text("ALTER TABLE positions ADD COLUMN user_id INTEGER DEFAULT 0"))
                     conn.commit()
                     print("✅ Database migrated: Added user_id column to positions table")
+                
+                if 'original_sl' not in columns:
+                    conn.execute(text("ALTER TABLE positions ADD COLUMN original_sl REAL"))
+                    conn.commit()
+                    conn.execute(text("UPDATE positions SET original_sl = stop_loss WHERE original_sl IS NULL"))
+                    conn.commit()
+                    print("✅ Database migrated: Added original_sl column to positions table and backfilled existing data")
+                
+                if 'sl_adjustment_count' not in columns:
+                    conn.execute(text("ALTER TABLE positions ADD COLUMN sl_adjustment_count INTEGER DEFAULT 0"))
+                    conn.commit()
+                    conn.execute(text("UPDATE positions SET sl_adjustment_count = 0 WHERE sl_adjustment_count IS NULL"))
+                    conn.commit()
+                    print("✅ Database migrated: Added sl_adjustment_count column to positions table")
+                
+                if 'max_profit_reached' not in columns:
+                    conn.execute(text("ALTER TABLE positions ADD COLUMN max_profit_reached REAL DEFAULT 0.0"))
+                    conn.commit()
+                    conn.execute(text("UPDATE positions SET max_profit_reached = 0.0 WHERE max_profit_reached IS NULL"))
+                    conn.commit()
+                    print("✅ Database migrated: Added max_profit_reached column to positions table")
+                
+                if 'last_price_update' not in columns:
+                    conn.execute(text("ALTER TABLE positions ADD COLUMN last_price_update TIMESTAMP"))
+                    conn.commit()
+                    conn.execute(text("UPDATE positions SET last_price_update = datetime('now') WHERE last_price_update IS NULL"))
+                    conn.commit()
+                    print("✅ Database migrated: Added last_price_update column to positions table")
             except Exception as e:
                 print(f"⚠️ Migration check for positions table: {e}")
     

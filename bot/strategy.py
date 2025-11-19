@@ -269,8 +269,8 @@ class TradingStrategy:
             if signal:
                 trend_strength, trend_desc = self.calculate_trend_strength(indicators)
                 
-                dynamic_tp_ratio = 1.0 + (trend_strength * 1.5)
-                dynamic_tp_ratio = min(dynamic_tp_ratio, 2.5)
+                dynamic_tp_ratio = 1.45 + (trend_strength * 1.05)
+                dynamic_tp_ratio = min(max(dynamic_tp_ratio, 1.45), 2.50)
                 
                 atr = indicators.get('atr', 1.0)
                 
