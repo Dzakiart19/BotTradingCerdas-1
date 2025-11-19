@@ -60,8 +60,41 @@ The bot's architecture is modular, designed for scalability and maintainability.
 -   **Multi-User Support:** Implements per-user position tracking, risk management, and separate data storage within the database.
 -   **Deployment:** Designed for Koyeb and Replit deployments, featuring an HTTP server for health checks and webhooks with `/bot<token>` endpoint format, PORT environment variable support, and automatic webhook setup.
 -   **Webhook Mode (Nov 2025):** Full webhook support untuk Telegram dengan auto-detect domain, endpoint `/bot<token>`, dan auto-setup saat start. Enable dengan `TELEGRAM_WEBHOOK_MODE=true`.
+-   **Free Tier Optimization (Nov 2025):** Optimized untuk Koyeb free tier dengan FREE_TIER_MODE, tick logging sampling (30x reduction), single-threaded chart generation, dan periodic garbage collection untuk reduce CPU/memory usage.
 
 ## Recent Changes (November 19, 2025)
+**V2.5 - Free Tier Optimization** (Latest)
+
+1. ✅ **FREE_TIER_MODE Configuration** (config.py):
+   - Added `FREE_TIER_MODE` flag (default: true) untuk optimize resource usage
+   - Added `TICK_LOG_SAMPLE_RATE` (default: 30) untuk control logging frequency
+   - Automatic resource optimization when enabled
+
+2. ✅ **Tick Logging Optimization** (bot/market_data.py):
+   - Reduced tick logging frequency dari setiap tick → setiap 30 ticks (30x reduction)
+   - Centralized tick logging method untuk consistency
+   - Changed tick logs dari INFO → DEBUG level untuk reduce I/O overhead
+   - Result: Massive reduction in CPU usage dari logging operations
+
+3. ✅ **Chart Generation Optimization** (bot/chart_generator.py):
+   - ThreadPoolExecutor max_workers: 1 when FREE_TIER_MODE (vs 2 for normal mode)
+   - Single-threaded chart generation untuk reduce CPU spikes
+   - Removed per-operation garbage collection untuk avoid excessive pause time
+
+4. ✅ **Smart Position Monitoring** (bot/task_scheduler.py):
+   - Position monitoring always runs untuk ghost position reconciliation
+   - Logs "Tidak ada active positions" hanya di DEBUG level (not INFO)
+   - Prevents missed stale positions while reducing logging noise
+
+5. ✅ **Periodic Garbage Collection** (bot/task_scheduler.py):
+   - Added periodic GC task running every 300 seconds (5 minutes)
+   - Explicit memory cleanup untuk prevent memory creep
+   - Single periodic GC instead of per-operation untuk avoid overhead
+
+**Impact:** CPU usage expected to drop significantly (target: <60%), bot should run stable di Koyeb free tier tanpa shutdown.
+
+---
+
 **V2.4 - Webhook Mode & Documentation Sync**
 
 1. ✅ **Webhook Mode Implementation**:
