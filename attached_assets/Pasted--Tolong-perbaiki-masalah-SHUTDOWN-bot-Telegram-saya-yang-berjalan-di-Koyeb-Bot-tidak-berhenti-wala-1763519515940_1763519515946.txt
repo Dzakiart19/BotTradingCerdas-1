@@ -1,0 +1,216 @@
+
+
+Tolong perbaiki masalah SHUTDOWN bot Telegram saya yang berjalan di Koyeb. Bot tidak berhenti walaupun sudah menerima perintah shutdown. Konsol Koyeb tetap berjalan padahal bot sudah tampil pesan "Bot shutting down" di Telegram. Ini berarti mekanisme shutdown di kode bot bermasalah.
+
+
+---
+
+🔥 Masalah Utama Yang Terjadi
+
+Bot saya mengalami masalah berikut:
+
+1. Bot tidak merespon SIGTERM dari Koyeb
+Koyeb mengirim SIGTERM saat service dihentikan / redeploy, tetapi bot tetap hidup di console.
+
+
+2. Shutdown tidak menghentikan semua asyncio tasks
+
+market_data websocket tetap berjalan
+
+task scheduler tetap berjalan
+
+telegram event loop tetap aktif
+
+
+
+3. Shutdown sequence tidak lengkap
+Bot menampilkan pesan "Bot Shutting Down" tetapi proses tidak mati → berarti ada task yang tidak dicancel.
+
+
+4. Konsol Koyeb masih aktif meskipun bot sudah shutdown
+→ Ini bukti shutdown handler tidak bekerja.
+
+
+
+
+---
+
+📌 File Yang Perlu Diperbaiki
+
+Saya ingin kamu memperbaiki 3 file berikut:
+
+1. main.py – signal handler, task tracking, shutdown orchestration
+
+
+2. bot/telegram_bot.py – monitoring loop, webhook cleanup, app shutdown
+
+
+3. bot/task_scheduler.py – scheduler loop & task execution cancellation
+
+
+
+Saya ingin KODE LENGKAP tanpa ellipsis (...).
+
+
+---
+
+🎯 Yang HARUS Kamu Perbaiki
+
+1. main.py
+
+WAJIB:
+
+Gunakan asyncio.Event() untuk koordinasi shutdown
+
+Registrasi signal handler kompatibel Linux/Koyeb
+
+Track SEMUA tasks:
+
+market_task
+bot_task
+position_task
+scheduler_task
+health_server_task
+
+Cancel tasks secara berurutan dan diawait
+
+Timeout total shutdown: 28–30 detik
+
+Jika gagal shutdown → paksa:
+
+os._exit(0)
+
+
+Masalah yang sering terjadi:
+
+❌ shutdown dipanggil tetapi gather() tidak dibatalkan
+❌ tasks tidak masuk list untuk dicancel
+❌ health server tidak berhenti
+❌ signal handler create_task tapi tidak menunggu selesai
+
+
+---
+
+2. bot/telegram_bot.py
+
+WAJIB diperbaiki:
+
+Semua monitoring task HARUS ditrack dalam list: monitoring_tasks
+
+Cancel semua monitoring loop sebelum stop bot
+
+Webhook deletion harus ada timeout
+
+Stop app → shutdown app → close session harus berurutan
+
+Pastikan tidak ada task telegram yang menggantung
+
+
+Yang saya inginkan:
+
+await delete_webhook(timeout=5)
+await app.stop(timeout=5)
+await app.shutdown(timeout=5)
+await app.session.close()
+
+Jika gagal → skip tapi jangan hang.
+
+
+---
+
+3. bot/task_scheduler.py
+
+Masalah yang sering terjadi:
+
+❌ current_execution_task tidak pernah dicancel
+❌ scheduler loop tidak berhenti
+❌ task yang sedang berjalan tetap hidup setelah shutdown
+
+WAJIB:
+
+Track semua task eksekusi scheduler
+
+Cancel scheduler loop
+
+Cancel semua task eksekusi
+
+Tunggu sampai semua selesai dengan timeout
+
+Bersihkan queue dan list task
+
+
+
+---
+
+📋 Behavior Yang Saya Inginkan Setelah Diperbaiki
+
+Saat Koyeb kirim SIGTERM:
+
+1. Bot menerima signal
+
+
+2. Bot kirim pesan “Shutting down…” ke Telegram
+
+
+3. Semua task dibatalkan:
+
+monitoring
+
+websocket market data
+
+scheduler
+
+telegram polling
+
+
+
+4. webhook Telegram dihapus
+
+
+5. health server mati
+
+
+6. database & session ditutup
+
+
+7. proses exit bersih (exit code 0)
+
+
+8. jika > 30 detik → force exit
+
+
+
+
+---
+
+🧪 Testing Checklist Yang Perlu Kamu Pastikan:
+
+Matikan service → bot harus langsung merespon SIGTERM
+
+Tidak ada task yang masih berjalan setelah shutdown
+
+Konsol Koyeb harus berhenti dan status berubah menjadi “Stopped”
+
+Tidak ada log setelah “Shutdown complete”
+
+
+
+---
+
+📝 Output Yang Saya Minta
+
+Berikan kode lengkap untuk 3 file berikut:
+
+1. main.py
+
+
+2. bot/telegram_bot.py
+
+
+3. bot/task_scheduler.py
+
+
+
+Tanpa potongan.
+Tanpa ellipsis.
+Tanpa menyisakan bagian untuk saya lengkapi.
