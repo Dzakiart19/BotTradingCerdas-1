@@ -116,7 +116,7 @@ class TradingBotOrchestrator:
         logger.info("All components initialized successfully")
     
     def _auto_detect_webhook_url(self) -> Optional[str]:
-        """Auto-detect webhook URL for Replit and other cloud platforms
+        """Auto-detect webhook URL for Replit, Koyeb, and other cloud platforms
         
         Returns:
             str: Auto-detected webhook URL or None if not detected
@@ -127,28 +127,41 @@ class TradingBotOrchestrator:
         import json
         from urllib.parse import urlparse
         
-        replit_domains = os.getenv('REPLIT_DOMAINS')
-        replit_dev_domain = os.getenv('REPLIT_DEV_DOMAIN')
-        
         domain = None
         
-        if replit_domains:
-            try:
-                domains_list = json.loads(replit_domains)
-                if isinstance(domains_list, list) and len(domains_list) > 0:
-                    domain = str(domains_list[0]).strip()
-                    logger.info(f"Detected Replit deployment domain from REPLIT_DOMAINS: {domain}")
-                else:
-                    logger.warning(f"REPLIT_DOMAINS is not a valid array: {replit_domains}")
-            except json.JSONDecodeError:
-                domain = replit_domains.strip().strip('[]"\'').split(',')[0].strip().strip('"\'')
-                logger.warning(f"Failed to parse REPLIT_DOMAINS as JSON, using fallback: {domain}")
-            except Exception as e:
-                logger.error(f"Error parsing REPLIT_DOMAINS: {e}")
+        koyeb_app_name = os.getenv('KOYEB_APP_NAME')
+        koyeb_service_name = os.getenv('KOYEB_SERVICE_NAME')
+        koyeb_public_domain = os.getenv('KOYEB_PUBLIC_DOMAIN')
         
-        if not domain and replit_dev_domain:
-            domain = replit_dev_domain.strip()
-            logger.info(f"Detected Replit dev domain from REPLIT_DEV_DOMAIN: {domain}")
+        if koyeb_public_domain:
+            domain = koyeb_public_domain.strip()
+            logger.info(f"Detected Koyeb domain from KOYEB_PUBLIC_DOMAIN: {domain}")
+        elif koyeb_app_name or koyeb_service_name:
+            app_name = koyeb_app_name or koyeb_service_name
+            domain = f"{app_name}.koyeb.app"
+            logger.info(f"Constructed Koyeb domain from app/service name: {domain}")
+        
+        if not domain:
+            replit_domains = os.getenv('REPLIT_DOMAINS')
+            replit_dev_domain = os.getenv('REPLIT_DEV_DOMAIN')
+            
+            if replit_domains:
+                try:
+                    domains_list = json.loads(replit_domains)
+                    if isinstance(domains_list, list) and len(domains_list) > 0:
+                        domain = str(domains_list[0]).strip()
+                        logger.info(f"Detected Replit deployment domain from REPLIT_DOMAINS: {domain}")
+                    else:
+                        logger.warning(f"REPLIT_DOMAINS is not a valid array: {replit_domains}")
+                except json.JSONDecodeError:
+                    domain = replit_domains.strip().strip('[]"\'').split(',')[0].strip().strip('"\'')
+                    logger.warning(f"Failed to parse REPLIT_DOMAINS as JSON, using fallback: {domain}")
+                except Exception as e:
+                    logger.error(f"Error parsing REPLIT_DOMAINS: {e}")
+            
+            if not domain and replit_dev_domain:
+                domain = replit_dev_domain.strip()
+                logger.info(f"Detected Replit dev domain from REPLIT_DEV_DOMAIN: {domain}")
         
         if domain:
             domain = domain.strip().strip('"\'')
@@ -173,7 +186,8 @@ class TradingBotOrchestrator:
             logger.info(f"✅ Auto-constructed webhook URL: {webhook_url}")
             return webhook_url
         
-        logger.warning("Could not auto-detect webhook URL - no Replit domain found")
+        logger.warning("Could not auto-detect webhook URL - no Koyeb/Replit domain found")
+        logger.warning("Set WEBHOOK_URL environment variable manually or KOYEB_PUBLIC_DOMAIN")
         return None
         
     async def start_health_server(self):
@@ -395,15 +409,34 @@ class TradingBotOrchestrator:
                 self.position_tracker.telegram_app = self.telegram_bot.app
                 logger.info("Telegram app set for alert system and position tracker")
             
-            if self.config.TELEGRAM_WEBHOOK_MODE and self.config.WEBHOOK_URL:
-                logger.info(f"Setting up webhook: {self.config.WEBHOOK_URL}")
-                try:
-                    await self.telegram_bot.setup_webhook(self.config.WEBHOOK_URL)
-                    logger.info("Webhook setup completed successfully")
-                except Exception as e:
-                    logger.error(f"Failed to setup webhook: {e}")
-                    if self.error_handler:
-                        self.error_handler.log_exception(e, "webhook_setup")
+            if self.config.TELEGRAM_WEBHOOK_MODE:
+                if self.config.WEBHOOK_URL:
+                    logger.info(f"Setting up webhook: {self.config.WEBHOOK_URL}")
+                    try:
+                        success = await self.telegram_bot.setup_webhook(self.config.WEBHOOK_URL)
+                        if success:
+                            logger.info("✅ Webhook setup completed successfully")
+                        else:
+                            logger.error("❌ Webhook setup failed!")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to setup webhook: {e}")
+                        if self.error_handler:
+                            self.error_handler.log_exception(e, "webhook_setup")
+                else:
+                    logger.error("=" * 60)
+                    logger.error("⚠️ WEBHOOK MODE ENABLED BUT NO WEBHOOK_URL!")
+                    logger.error("=" * 60)
+                    logger.error("Webhook mode is enabled but WEBHOOK_URL is not set.")
+                    logger.error("This means bot CANNOT receive Telegram updates!")
+                    logger.error("")
+                    logger.error("To fix this:")
+                    logger.error("1. Set WEBHOOK_URL environment variable in Koyeb, OR")
+                    logger.error("2. Set KOYEB_PUBLIC_DOMAIN environment variable, OR")
+                    logger.error("3. Run this command to set webhook manually:")
+                    logger.error("   python3 fix_webhook.py")
+                    logger.error("")
+                    logger.error("Bot will continue but WILL NOT respond to commands!")
+                    logger.error("=" * 60)
             
             logger.info("Starting Telegram bot polling...")
             bot_task = asyncio.create_task(self.telegram_bot.run())
