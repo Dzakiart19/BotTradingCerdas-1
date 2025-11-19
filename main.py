@@ -220,23 +220,30 @@ class TradingBotOrchestrator:
             
             async def telegram_webhook(request):
                 if not self.config.TELEGRAM_WEBHOOK_MODE:
-                    logger.warning("Webhook endpoint called but webhook mode is disabled")
+                    logger.warning("⚠️ Webhook endpoint called but webhook mode is disabled")
                     return web.json_response({'error': 'Webhook mode is disabled'}, status=400)
                 
                 if not self.telegram_bot or not self.telegram_bot.app:
-                    logger.error("Webhook called but telegram bot not initialized")
+                    logger.error("❌ Webhook called but telegram bot not initialized (running in limited mode?)")
+                    logger.error("Check if TELEGRAM_BOT_TOKEN and AUTHORIZED_USER_IDS are set in environment variables")
                     return web.json_response({'error': 'Bot not initialized'}, status=503)
                 
                 try:
                     update_data = await request.json()
-                    logger.debug(f"Received webhook update: {update_data.get('update_id', 'unknown')}")
+                    update_id = update_data.get('update_id', 'unknown')
+                    message_text = update_data.get('message', {}).get('text', 'no text')
+                    user_id = update_data.get('message', {}).get('from', {}).get('id', 'unknown')
+                    
+                    logger.info(f"📨 Webhook received: update_id={update_id}, user={user_id}, message='{message_text}'")
                     
                     await self.telegram_bot.process_update(update_data)
                     
+                    logger.info(f"✅ Webhook processed successfully: update_id={update_id}")
                     return web.json_response({'ok': True})
                     
                 except Exception as e:
-                    logger.error(f"Error processing webhook request: {e}")
+                    logger.error(f"❌ Error processing webhook request: {e}")
+                    logger.error(f"Request path: {request.path}, Method: {request.method}")
                     if self.error_handler:
                         self.error_handler.log_exception(e, "webhook_endpoint")
                     return web.json_response({'error': str(e)}, status=500)

@@ -2,6 +2,35 @@
 
 Panduan lengkap untuk deploy XAUUSD Trading Bot ke Koyeb.
 
+## ⚠️ PENTING: Bot Tidak Merespon?
+
+**Jika bot tidak merespon command sama sekali:**
+
+Bot kemungkinan besar running dalam **"limited mode"** karena environment variables belum di-set dengan benar di Koyeb.
+
+**Cek status bot:**
+1. Buka URL Koyeb service Anda: `https://<your-service>.koyeb.app/health`
+2. Lihat field `"mode"`:
+   - ✅ `"mode": "full"` → Bot berjalan normal, siap menerima command
+   - ❌ `"mode": "limited"` → Bot TIDAK akan merespon, perlu set environment variables!
+
+**Jika limited mode, lihat field `"missing_config"`:**
+```json
+{
+  "mode": "limited",
+  "missing_config": [
+    "TELEGRAM_BOT_TOKEN",
+    "AUTHORIZED_USER_IDS"
+  ]
+}
+```
+
+**Solusi: Set environment variables yang kurang → Restart service!**
+
+Scroll ke bagian **"4. Environment Variables"** di bawah untuk panduan lengkap.
+
+---
+
 ## 📋 Prerequisites
 
 1. **Akun Koyeb** (gratis): https://www.koyeb.com/
@@ -29,15 +58,39 @@ Di bagian **"Build"**:
 - **Build command**: (kosongkan, atau isi `pip install -r requirements.txt`)
 - **Run command**: `python main.py`
 
-### 4. Environment Variables
+### 4. Environment Variables ⚡ WAJIB
 
-Tambahkan environment variables berikut di Koyeb:
+**TANPA ENVIRONMENT VARIABLES INI, BOT TIDAK AKAN MERESPON COMMAND!**
 
-**WAJIB:**
+#### Cara Set Environment Variables di Koyeb:
+
+1. Di Koyeb Dashboard, klik service trading bot Anda
+2. Klik tab **"Settings"**
+3. Scroll ke bagian **"Environment variables"**
+4. Klik **"Add variable"**
+5. Masukkan NAME dan VALUE untuk setiap variable
+6. Klik **"Save"** setelah semua variable ditambahkan
+7. **WAJIB: Klik "Redeploy"** untuk apply perubahan!
+
+#### Variable WAJIB (Bot tidak akan jalan tanpa ini):
+
+**1. TELEGRAM_BOT_TOKEN**
 ```
-TELEGRAM_BOT_TOKEN=<token dari @BotFather>
-AUTHORIZED_USER_IDS=<user ID Telegram Anda>
+NAME:  TELEGRAM_BOT_TOKEN
+VALUE: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz1234567890
 ```
+- Dapatkan dari @BotFather di Telegram
+- Kirim `/newbot` ke @BotFather untuk buat bot baru
+- Copy token yang diberikan (format: angka:huruf-angka)
+
+**2. AUTHORIZED_USER_IDS**
+```
+NAME:  AUTHORIZED_USER_IDS
+VALUE: 123456789
+```
+- Dapatkan user ID Telegram Anda dari @userinfobot
+- Kirim pesan apa saja ke @userinfobot untuk dapatkan ID
+- Jika lebih dari 1 user, pisahkan dengan koma: `123456,789012,345678`
 
 **WEBHOOK MODE (Recommended untuk Koyeb):**
 ```
@@ -117,6 +170,74 @@ FIXED_RISK_AMOUNT=1.0
    ```
 
 ## 🔍 Troubleshooting
+
+### ❌ Bot Tidak Merespon Command Sama Sekali
+
+**Gejala**: Bot tidak reply command `/start`, `/help`, atau command lainnya, meskipun logs di Koyeb "aman-aman saja" (tidak ada error).
+
+**Root Cause**: Bot running dalam **limited mode** karena environment variables tidak di-set.
+
+**Cara Diagnosa:**
+1. Buka browser, akses: `https://<your-service>.koyeb.app/health`
+2. Cek field `"mode"` di response JSON:
+   ```json
+   {
+     "status": "limited",
+     "mode": "limited",
+     "config_valid": false,
+     "missing_config": ["TELEGRAM_BOT_TOKEN", "AUTHORIZED_USER_IDS"],
+     "message": "Bot running in limited mode - set missing environment variables"
+   }
+   ```
+
+**Solusi Step-by-Step:**
+
+1. **Set Environment Variables di Koyeb:**
+   - Klik service Anda → Tab "Settings"
+   - Scroll ke "Environment variables"
+   - Tambahkan variable `TELEGRAM_BOT_TOKEN` dan `AUTHORIZED_USER_IDS`
+   - Lihat section **"4. Environment Variables"** di atas untuk detail lengkap
+
+2. **Restart Service:**
+   - Klik tombol **"Redeploy"** di Koyeb Dashboard
+   - Tunggu 2-3 menit hingga status jadi "Healthy"
+
+3. **Verify Bot Sudah Full Mode:**
+   - Akses lagi: `https://<your-service>.koyeb.app/health`
+   - Pastikan `"mode": "full"` dan `"config_valid": true`
+   - HTTP Status Code harus **200** (bukan 503)
+
+4. **Test di Telegram:**
+   - Kirim `/start` ke bot Anda
+   - Bot harus balas dengan welcome message
+   - Jika masih belum ada balasan, cek logs di Koyeb untuk error
+
+**Cek Logs di Koyeb:**
+```
+# Logs yang BENAR (full mode):
+✅ All components initialized successfully
+✅ Webhook route registered: /bot123456789:ABC...
+✅ Telegram bot is running!
+✅ BOT IS NOW RUNNING
+
+# Logs yang SALAH (limited mode):
+⚠️ Configuration validation issues: TELEGRAM_BOT_TOKEN is required
+⚠️ Bot will start in limited mode
+⚠️ RUNNING IN LIMITED MODE
+⚠️ Webhook route not registered - limited mode
+```
+
+**Webhook Logging Enhancement:**
+Mulai v2.9, bot akan log setiap webhook yang diterima:
+```
+📨 Webhook received: update_id=123456, user=789012, message='/start'
+🔄 Processing webhook update 123456 from user 789012: '/start'
+✅ Webhook processed successfully: update_id=123456
+```
+
+Jika Anda TIDAK melihat logs ini saat kirim command, berarti:
+- Bot dalam limited mode (environment variables kurang), ATAU
+- Webhook tidak setup dengan benar (Telegram tidak bisa kirim updates ke bot)
 
 ### Webhook Mode Tidak Aktif
 

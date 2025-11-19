@@ -912,11 +912,13 @@ class TradingBot:
     
     async def process_update(self, update_data):
         if not self.app:
-            logger.error("Bot not initialized! Cannot process update.")
+            logger.error("❌ Bot not initialized! Cannot process update.")
+            logger.error("This usually means bot is running in limited mode")
+            logger.error("Set TELEGRAM_BOT_TOKEN and AUTHORIZED_USER_IDS and restart")
             return
         
         if not update_data:
-            logger.error("Received empty update data")
+            logger.error("❌ Received empty update data")
             return
         
         try:
@@ -925,7 +927,7 @@ class TradingBot:
             
             if isinstance(update_data, Update):
                 update = update_data
-                logger.debug(f"Received native telegram.Update object: {update.update_id}")
+                logger.info(f"📥 Received native telegram.Update object: {update.update_id}")
             else:
                 parsed_data = update_data
                 
@@ -934,7 +936,7 @@ class TradingBot:
                         parsed_data = json.loads(update_data)
                         logger.debug("Parsed webhook update from JSON string")
                     except json.JSONDecodeError as e:
-                        logger.error(f"Failed to parse JSON string update: {e}")
+                        logger.error(f"❌ Failed to parse JSON string update: {e}")
                         return
                 elif hasattr(update_data, 'to_dict') and callable(update_data.to_dict):
                     try:
@@ -950,13 +952,20 @@ class TradingBot:
             
             if update:
                 update_id = update.update_id
-                logger.debug(f"Processing webhook update: {update_id}")
+                
+                message_info = ""
+                if update.message:
+                    message_info = f" from user {update.message.from_user.id}"
+                    if update.message.text:
+                        message_info += f": '{update.message.text}'"
+                
+                logger.info(f"🔄 Processing webhook update {update_id}{message_info}")
                 
                 await self.app.process_update(update)
                 
-                logger.debug(f"✅ Successfully processed update: {update_id}")
+                logger.info(f"✅ Successfully processed update {update_id}")
             else:
-                logger.warning("Received invalid or malformed update data")
+                logger.warning("⚠️ Received invalid or malformed update data")
                 from collections.abc import Mapping
                 if isinstance(parsed_data, Mapping):
                     logger.debug(f"Update data keys: {list(parsed_data.keys())}")
