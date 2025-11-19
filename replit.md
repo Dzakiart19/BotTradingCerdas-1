@@ -63,47 +63,61 @@ The bot's architecture is modular, designed for scalability and maintainability.
 -   **Free Tier Optimization (Nov 2025):** Optimized untuk Koyeb free tier dengan FREE_TIER_MODE, tick logging sampling (30x reduction), single-threaded chart generation, dan periodic garbage collection untuk reduce CPU/memory usage.
 
 ## Recent Changes (November 19, 2025)
-**V2.6 - Graceful Shutdown Fix untuk Koyeb** (Latest)
+**V2.7 - Production-Ready Shutdown untuk Koyeb** (Latest)
+
+1. ✅ **Event Loop Race Condition Fix** (main.py):
+   - Mengganti `asyncio.get_event_loop()` dengan `asyncio.get_running_loop()` di shutdown()
+   - Capture loop reference di awal untuk menghindari RuntimeError saat loop closing
+   - Eliminasi race condition antara shutdown process dan loop teardown
+
+2. ✅ **Thread-Safe Signal Handler** (main.py):
+   - Signal handler menggunakan `loop.call_soon_threadsafe()` untuk thread-safe operation
+   - Defensive guard untuk RuntimeError jika signal datang setelah loop closing
+   - Proper coordination antara signal handler dan running event loop
+
+3. ✅ **Proper Logging Shutdown Sequence** (main.py):
+   - `logging.shutdown()` dipindahkan dari finally block ke end of cleanup
+   - Logging shutdown hanya dipanggil SETELAH semua cleanup selesai
+   - Semua komponen bisa emit log messages selama cleanup process
+   - Exception path juga properly handled dengan logging.shutdown()
+
+4. ✅ **Clean Exit Code Propagation** (main.py):
+   - `main()` sekarang return status code (0 = success, 1 = error)
+   - `asyncio.run()` completes dan cleanup loop dengan benar
+   - `sys.exit()` dipanggil dengan proper exit code dari main()
+   - Eliminasi `os._exit(0)` yang bypass Python cleanup
+
+5. ✅ **Proper Shutdown Duration Tracking** (main.py):
+   - Menggunakan captured loop reference untuk timing calculations
+   - Tidak ada lagi `asyncio.get_event_loop()` calls setelah loop starts closing
+   - Accurate shutdown duration metrics dengan timeout warning jika melebihi 28s
+
+6. ✅ **Exception Handling yang Robust** (main.py):
+   - Try/except/finally structure yang proper untuk semua cleanup paths
+   - Logging.shutdown() dipanggil di exception path sebelum re-raise
+   - shutdown_in_progress flag direset di finally block
+   - Error propagation works correctly untuk debugging
+
+**Impact:** Bot sekarang shutdown dengan sempurna di Koyeb - clean exit code, no race conditions, proper asyncio cleanup, dan thread-safe signal handling. Ready untuk production 24/7.
+
+---
+
+**V2.6 - Graceful Shutdown Fix untuk Koyeb**
 
 1. ✅ **Signal Handler Perbaikan** (main.py):
    - Menggunakan `asyncio.Event()` untuk shutdown signal (kompatibel Linux/Koyeb)
-   - Mengganti `loop.call_soon_threadsafe()` yang bermasalah dengan SIGTERM
-   - Shutdown sequence yang lebih clean dan reliable
+   - Task tracking & cancellation untuk semua async tasks
+   - Shutdown timeout 28 detik (sesuai standar Koyeb 30s)
 
-2. ✅ **Task Tracking & Cancellation** (main.py):
-   - Menambahkan `tracked_tasks[]` untuk melacak semua async tasks
-   - Proper cancellation untuk market_task, position_task, bot_task dengan timeout
-   - Semua tasks di-await sampai selesai atau timeout
-
-3. ✅ **Timeout Shutdown Diperpanjang** (main.py):
-   - Meningkatkan timeout dari 10 detik → **28 detik** (sesuai standar Koyeb 30s)
-   - Per-component timeout: 5-8 detik per operasi
-   - Total shutdown maksimal: 28 detik sebelum force exit
-
-4. ✅ **Force Exit Mechanism** (main.py):
-   - Menambahkan `os._exit(0)` jika graceful shutdown melebihi timeout
-   - Mencegah zombie process dan hanging di Koyeb
-   - Bot pasti keluar dengan clean exit code 0
-
-5. ✅ **Telegram Bot Shutdown** (bot/telegram_bot.py):
+2. ✅ **Telegram Bot Shutdown** (bot/telegram_bot.py):
    - Tracking `monitoring_tasks[]` untuk semua monitoring loops
-   - Proper cancellation monitoring tasks sebelum stop app
    - Webhook cleanup dengan `delete_webhook(drop_pending_updates=True)` + timeout 5s
    - Sequential shutdown: Cancel monitoring → Delete webhook → Stop app → Shutdown app
 
-6. ✅ **Task Scheduler Shutdown** (bot/task_scheduler.py):
+3. ✅ **Task Scheduler Shutdown** (bot/task_scheduler.py):
    - Tracking `active_task_executions[]` untuk semua running tasks
    - Cancel scheduler loop dengan proper timeout (3s)
    - Cancel semua active tasks dengan timeout (5s)
-   - Clean callback system untuk auto-remove completed tasks
-
-7. ✅ **Logging Detail untuk Debugging**:
-   - Setiap tahap shutdown tercatat dengan jelas
-   - Logging durasi shutdown actual vs timeout
-   - Warning jika ada operasi yang timeout
-   - Error logs dengan context lengkap
-
-**Impact:** Bot sekarang shutdown dengan benar di Koyeb, merespons SIGTERM, cancel semua tasks, hapus webhook, dan exit dengan clean tanpa zombie process.
 
 ---
 
