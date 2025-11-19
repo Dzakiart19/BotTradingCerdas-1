@@ -1,4 +1,5 @@
 import asyncio
+import gc
 from datetime import datetime, time, timedelta
 from typing import Callable, Optional, Dict, List
 import pytz
@@ -276,6 +277,14 @@ def setup_default_tasks(scheduler: TaskScheduler, bot_components: Dict):
             updated = await position_tracker.monitor_active_positions()
             if updated:
                 logger.info(f"Position monitoring: {len(updated)} positions updated")
+            else:
+                logger.debug("Position monitoring: Tidak ada active positions")
+    
+    async def periodic_gc():
+        # Periodic GC setiap 5 menit untuk mengurangi memory footprint
+        # HANYA gunakan periodic GC, bukan per-operation GC, untuk menghindari excessive pause time
+        gc.collect()
+        logger.debug("Periodic garbage collection completed")
     
     scheduler.add_interval_task(
         'cleanup_charts',
@@ -307,6 +316,12 @@ def setup_default_tasks(scheduler: TaskScheduler, bot_components: Dict):
         'monitor_positions',
         monitor_positions,
         interval_seconds=10
+    )
+    
+    scheduler.add_interval_task(
+        'garbage_collection',
+        periodic_gc,
+        interval_seconds=300
     )
     
     logger.info("Default tasks setup completed")

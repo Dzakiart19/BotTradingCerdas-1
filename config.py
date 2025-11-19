@@ -59,6 +59,8 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
     TELEGRAM_WEBHOOK_MODE = os.getenv('TELEGRAM_WEBHOOK_MODE', 'false').lower() == 'true'
     WEBHOOK_URL = os.getenv('WEBHOOK_URL', '')
+    FREE_TIER_MODE = os.getenv('FREE_TIER_MODE', 'true').lower() == 'true'
+    TICK_LOG_SAMPLE_RATE = _get_int_env('TICK_LOG_SAMPLE_RATE', '30')
     AUTHORIZED_USER_IDS = _parse_user_ids(os.getenv('AUTHORIZED_USER_IDS', ''))
     EMA_PERIODS = _parse_int_list(os.getenv('EMA_PERIODS', '5,10,20'), [5, 10, 20])
     

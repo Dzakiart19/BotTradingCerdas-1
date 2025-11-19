@@ -98,7 +98,22 @@ class MarketDataClient:
         self.subscribers = {}
         self.subscriber_failures = {}
         self.max_consecutive_failures = 5
+        self.tick_log_counter = 0
         logger.info("Pub/Sub mechanism initialized")
+    
+    def _log_tick_sample(self, bid: float, ask: float, quote: float, spread: float = None, mode: str = ""):
+        """Centralized tick logging dengan sampling - increment counter HANYA 1x per tick"""
+        self.tick_log_counter += 1
+        if self.tick_log_counter % self.config.TICK_LOG_SAMPLE_RATE == 0:
+            if mode == "simulator":
+                logger.info(f"💰 Simulator Tick Sample (setiap {self.config.TICK_LOG_SAMPLE_RATE}): Bid=${bid:.2f}, Ask=${ask:.2f}, Spread=${spread:.2f}")
+            else:
+                logger.info(f"💰 Tick Sample (setiap {self.config.TICK_LOG_SAMPLE_RATE}): Bid={bid:.2f}, Ask={ask:.2f}, Quote={quote:.2f}")
+        else:
+            if mode == "simulator":
+                logger.debug(f"Simulator: Bid=${bid:.2f}, Ask=${ask:.2f}, Spread=${spread:.2f}")
+            else:
+                logger.debug(f"💰 Tick: Bid={bid:.2f}, Ask={ask:.2f}, Quote={quote:.2f}")
     
     async def subscribe_ticks(self, name: str) -> asyncio.Queue:
         queue = asyncio.Queue(maxsize=100)
@@ -333,8 +348,7 @@ class MarketDataClient:
                 }
                 await self._broadcast_tick(tick_data)
                 
-                if random.randint(1, 100) == 1:
-                    logger.debug(f"Simulator: Bid=${self.current_bid:.2f}, Ask=${self.current_ask:.2f}, Spread=${spread:.2f}")
+                self._log_tick_sample(self.current_bid, self.current_ask, self.current_quote, spread, mode="simulator")
                 
                 self.base_price = mid_price
                 
@@ -367,7 +381,7 @@ class MarketDataClient:
                         self.m1_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
                         self.m5_builder.add_tick(self.current_bid, self.current_ask, self.current_timestamp)
                         
-                        logger.info(f"💰 Tick: Bid={self.current_bid:.2f}, Ask={self.current_ask:.2f}, Quote={self.current_quote:.2f}")
+                        self._log_tick_sample(self.current_bid, self.current_ask, self.current_quote, mode="websocket")
                         
                         tick_data = {
                             'bid': self.current_bid,

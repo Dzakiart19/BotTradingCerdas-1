@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional
 import json
 import asyncio
+import gc
 from concurrent.futures import ThreadPoolExecutor
 from bot.logger import setup_logger
 
@@ -15,7 +16,9 @@ class ChartGenerator:
         self.config = config
         self.chart_dir = 'charts'
         os.makedirs(self.chart_dir, exist_ok=True)
-        self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="chart_gen")
+        max_workers = 1 if self.config.FREE_TIER_MODE else 2
+        self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="chart_gen")
+        logger.info(f"ChartGenerator initialized dengan max_workers={max_workers} (FREE_TIER_MODE={self.config.FREE_TIER_MODE})")
     
     def generate_chart(self, df: pd.DataFrame, signal: Optional[dict] = None,
                       timeframe: str = 'M1') -> Optional[str]:
@@ -156,6 +159,7 @@ class ChartGenerator:
             )
             
             logger.info(f"Chart generated: {filepath}")
+            
             return filepath
             
         except Exception as e:
