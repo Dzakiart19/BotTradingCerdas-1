@@ -156,7 +156,7 @@ class Config:
     
     DRY_RUN = os.getenv('DRY_RUN', 'false').lower() == 'true'
     
-    HEALTH_CHECK_PORT = _get_int_env('HEALTH_CHECK_PORT', '8080')
+    HEALTH_CHECK_PORT = _get_int_env('PORT', '8080')
     
     XAUUSD_PIP_VALUE = 10.0
     LOT_SIZE = 0.01

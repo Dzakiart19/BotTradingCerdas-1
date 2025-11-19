@@ -206,6 +206,7 @@ class TradingBotOrchestrator:
             
             app = web.Application()
             app.router.add_get('/health', health_check)
+            app.router.add_get('/', health_check)
             app.router.add_post('/webhook', telegram_webhook)
             
             runner = web.AppRunner(app)
@@ -311,6 +312,16 @@ class TradingBotOrchestrator:
                 self.alert_system.telegram_app = self.telegram_bot.app
                 self.position_tracker.telegram_app = self.telegram_bot.app
                 logger.info("Telegram app set for alert system and position tracker")
+            
+            if self.config.TELEGRAM_WEBHOOK_MODE and self.config.WEBHOOK_URL:
+                logger.info(f"Setting up webhook: {self.config.WEBHOOK_URL}")
+                try:
+                    await self.telegram_bot.setup_webhook(self.config.WEBHOOK_URL)
+                    logger.info("Webhook setup completed successfully")
+                except Exception as e:
+                    logger.error(f"Failed to setup webhook: {e}")
+                    if self.error_handler:
+                        self.error_handler.log_exception(e, "webhook_setup")
             
             logger.info("Starting Telegram bot polling...")
             bot_task = asyncio.create_task(self.telegram_bot.run())
