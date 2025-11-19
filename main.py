@@ -36,7 +36,9 @@ class TradingBotOrchestrator:
         
         self.running = False
         self.shutdown_in_progress = False
+        self.shutdown_event = asyncio.Event()
         self.health_server = None
+        self.tracked_tasks = []
         
         logger.info("Initializing Trading Bot components...")
         
@@ -277,6 +279,7 @@ class TradingBotOrchestrator:
             
             logger.info("Connecting to market data feed...")
             market_task = asyncio.create_task(self.market_data.connect_websocket())
+            self.tracked_tasks.append(market_task)
             
             logger.info("Waiting for initial market data...")
             for i in range(30):
@@ -300,6 +303,7 @@ class TradingBotOrchestrator:
             position_task = asyncio.create_task(
                 self.position_tracker.monitor_positions(self.market_data)
             )
+            self.tracked_tasks.append(position_task)
             
             logger.info("Initializing Telegram bot...")
             bot_initialized = await self.telegram_bot.initialize()
@@ -329,6 +333,7 @@ class TradingBotOrchestrator:
             
             logger.info("Starting Telegram bot polling...")
             bot_task = asyncio.create_task(self.telegram_bot.run())
+            self.tracked_tasks.append(bot_task)
             
             logger.info("Waiting for candles to build (minimal 30 candles)...")
             for i in range(60):
@@ -372,7 +377,7 @@ class TradingBotOrchestrator:
             logger.info("=" * 60)
             logger.info("Press Ctrl+C to stop")
             
-            await asyncio.gather(market_task, bot_task, position_task, return_exceptions=True)
+            await self.shutdown_event.wait()
             
         except asyncio.CancelledError:
             logger.info("Bot tasks cancelled")
@@ -396,7 +401,9 @@ class TradingBotOrchestrator:
         logger.info("=" * 60)
         
         self.running = False
-        shutdown_timeout = 10
+        shutdown_timeout = 28
+        
+        shutdown_start_time = asyncio.get_event_loop().time()
         
         try:
             if self.telegram_bot and self.telegram_bot.app and self.config.AUTHORIZED_USER_IDS:
@@ -414,18 +421,36 @@ class TradingBotOrchestrator:
                             except Exception as e:
                                 logger.error(f"Failed to send shutdown message: {e}")
                     
-                    await asyncio.wait_for(send_shutdown_messages(), timeout=shutdown_timeout)
+                    await asyncio.wait_for(send_shutdown_messages(), timeout=5)
                 except asyncio.TimeoutError:
-                    logger.warning(f"Sending shutdown messages timed out after {shutdown_timeout}s")
+                    logger.warning(f"Sending shutdown messages timed out after 5s")
                 except Exception as e:
                     logger.error(f"Error sending shutdown messages: {e}")
+            
+            logger.info("Cancelling tracked async tasks...")
+            cancelled_count = 0
+            for task in self.tracked_tasks:
+                if not task.done():
+                    task.cancel()
+                    cancelled_count += 1
+            
+            if cancelled_count > 0:
+                logger.info(f"Cancelled {cancelled_count} tasks, waiting for completion...")
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*self.tracked_tasks, return_exceptions=True),
+                        timeout=8
+                    )
+                    logger.info("All tracked tasks completed")
+                except asyncio.TimeoutError:
+                    logger.warning("Some tasks did not complete within timeout")
             
             logger.info("Stopping Telegram bot...")
             if self.telegram_bot:
                 try:
-                    await asyncio.wait_for(self.telegram_bot.stop(), timeout=shutdown_timeout)
+                    await asyncio.wait_for(self.telegram_bot.stop(), timeout=8)
                 except asyncio.TimeoutError:
-                    logger.warning(f"Telegram bot shutdown timed out after {shutdown_timeout}s")
+                    logger.warning(f"Telegram bot shutdown timed out after 8s")
                 except Exception as e:
                     logger.error(f"Error stopping Telegram bot: {e}")
             
@@ -439,9 +464,9 @@ class TradingBotOrchestrator:
             logger.info("Stopping task scheduler...")
             if self.task_scheduler:
                 try:
-                    await asyncio.wait_for(self.task_scheduler.stop(), timeout=shutdown_timeout)
+                    await asyncio.wait_for(self.task_scheduler.stop(), timeout=5)
                 except asyncio.TimeoutError:
-                    logger.warning(f"Task scheduler shutdown timed out after {shutdown_timeout}s")
+                    logger.warning(f"Task scheduler shutdown timed out after 5s")
                 except Exception as e:
                     logger.error(f"Error stopping task scheduler: {e}")
             
@@ -469,12 +494,14 @@ class TradingBotOrchestrator:
             logger.info("Stopping health server...")
             if self.health_server:
                 try:
-                    await asyncio.wait_for(self.health_server.cleanup(), timeout=shutdown_timeout)
+                    await asyncio.wait_for(self.health_server.cleanup(), timeout=5)
                 except asyncio.TimeoutError:
-                    logger.warning(f"Health server shutdown timed out after {shutdown_timeout}s")
+                    logger.warning(f"Health server shutdown timed out after 5s")
                 except Exception as e:
                     logger.error(f"Error stopping health server: {e}")
             
+            shutdown_duration = asyncio.get_event_loop().time() - shutdown_start_time
+            logger.info(f"Shutdown completed in {shutdown_duration:.2f}s")
             logger.info("=" * 60)
             logger.info("BOT SHUTDOWN COMPLETE")
             logger.info("=" * 60)
@@ -483,14 +510,20 @@ class TradingBotOrchestrator:
             logger.error(f"Error during shutdown: {e}")
         finally:
             self.shutdown_in_progress = False
+            
+            elapsed = asyncio.get_event_loop().time() - shutdown_start_time
+            if elapsed > shutdown_timeout:
+                logger.warning(f"Graceful shutdown exceeded timeout ({elapsed:.2f}s > {shutdown_timeout}s)")
+                logger.warning("Forcing exit...")
+                os._exit(0)
 
 async def main():
     orchestrator = TradingBotOrchestrator()
-    loop = asyncio.get_running_loop()
     
     def signal_handler(sig, frame):
-        logger.info(f"Received signal {sig}")
-        loop.call_soon_threadsafe(lambda: asyncio.create_task(orchestrator.shutdown()))
+        signame = signal.Signals(sig).name
+        logger.info(f"Received signal {signame} ({sig})")
+        orchestrator.shutdown_event.set()
     
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -502,7 +535,8 @@ async def main():
     except Exception as e:
         logger.error(f"Unhandled exception in main: {e}")
     finally:
-        await orchestrator.shutdown()
+        if not orchestrator.shutdown_in_progress:
+            await orchestrator.shutdown()
 
 if __name__ == "__main__":
     try:

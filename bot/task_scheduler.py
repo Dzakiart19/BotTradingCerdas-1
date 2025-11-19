@@ -20,6 +20,7 @@ class ScheduledTask:
         self.enabled = True
         self.run_count = 0
         self.error_count = 0
+        self.current_execution_task = None
         
         self._calculate_next_run()
     
@@ -60,7 +61,8 @@ class ScheduledTask:
             logger.info(f"Executing scheduled task: {self.name}")
             
             if asyncio.iscoroutinefunction(self.func):
-                await self.func()
+                self.current_execution_task = asyncio.create_task(self.func())
+                await self.current_execution_task
             else:
                 self.func()
             
@@ -70,9 +72,14 @@ class ScheduledTask:
             
             logger.info(f"Task completed: {self.name} (Total runs: {self.run_count})")
             
+        except asyncio.CancelledError:
+            logger.info(f"Task cancelled: {self.name}")
+            raise
         except Exception as e:
             self.error_count += 1
             logger.error(f"Error executing task {self.name}: {e}")
+        finally:
+            self.current_execution_task = None
     
     def enable(self):
         self.enabled = True
@@ -101,6 +108,7 @@ class TaskScheduler:
         self.tasks: Dict[str, ScheduledTask] = {}
         self.running = False
         self.scheduler_task = None
+        self.active_task_executions = []
         logger.info("Task scheduler initialized")
     
     def add_task(self, name: str, func: Callable, interval: Optional[int] = None,
@@ -153,19 +161,30 @@ class TaskScheduler:
     async def _scheduler_loop(self):
         logger.info("Scheduler loop started")
         
-        while self.running:
-            try:
-                for task in self.tasks.values():
-                    if task.should_run():
-                        asyncio.create_task(task.execute())
-                
-                await asyncio.sleep(1)
-                
-            except Exception as e:
-                logger.error(f"Error in scheduler loop: {e}")
-                await asyncio.sleep(5)
-        
-        logger.info("Scheduler loop stopped")
+        try:
+            while self.running:
+                try:
+                    for task in self.tasks.values():
+                        if task.should_run():
+                            execution_task = asyncio.create_task(task.execute())
+                            self.active_task_executions.append(execution_task)
+                            
+                            def remove_task(t):
+                                if t in self.active_task_executions:
+                                    self.active_task_executions.remove(t)
+                            
+                            execution_task.add_done_callback(remove_task)
+                    
+                    await asyncio.sleep(1)
+                    
+                except asyncio.CancelledError:
+                    logger.info("Scheduler loop cancelled")
+                    break
+                except Exception as e:
+                    logger.error(f"Error in scheduler loop: {e}")
+                    await asyncio.sleep(5)
+        finally:
+            logger.info("Scheduler loop exiting")
     
     async def start(self):
         if self.running:
@@ -177,26 +196,62 @@ class TaskScheduler:
         logger.info("Task scheduler started")
     
     async def stop(self):
+        logger.info("=" * 50)
+        logger.info("STOPPING TASK SCHEDULER")
+        logger.info("=" * 50)
+        
         if not self.running:
             logger.warning("Scheduler not running")
             return
         
         self.running = False
         
-        if self.scheduler_task:
+        if self.scheduler_task and not self.scheduler_task.done():
+            logger.info("Cancelling scheduler loop task...")
             self.scheduler_task.cancel()
             try:
-                await self.scheduler_task
+                await asyncio.wait_for(self.scheduler_task, timeout=3)
+                logger.info("✅ Scheduler loop stopped")
+            except asyncio.TimeoutError:
+                logger.warning("Scheduler loop cancellation timed out")
             except asyncio.CancelledError:
-                pass
+                logger.info("✅ Scheduler loop cancelled")
+            except Exception as e:
+                logger.error(f"Error stopping scheduler loop: {e}")
         
-        logger.info("Task scheduler stopped")
+        active_count = len(self.active_task_executions)
+        if active_count > 0:
+            logger.info(f"Cancelling {active_count} active task executions...")
+            for task_exec in self.active_task_executions:
+                if not task_exec.done():
+                    task_exec.cancel()
+            
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*self.active_task_executions, return_exceptions=True),
+                    timeout=5
+                )
+                logger.info("✅ All task executions cancelled")
+            except asyncio.TimeoutError:
+                logger.warning("Some task executions did not complete within timeout")
+        
+        for task_name, task in self.tasks.items():
+            if task.current_execution_task and not task.current_execution_task.done():
+                logger.info(f"Cancelling running task: {task_name}")
+                task.current_execution_task.cancel()
+        
+        self.active_task_executions.clear()
+        
+        logger.info("=" * 50)
+        logger.info("TASK SCHEDULER STOPPED")
+        logger.info("=" * 50)
     
     def get_status(self) -> Dict:
         return {
             'running': self.running,
             'total_tasks': len(self.tasks),
             'enabled_tasks': len([t for t in self.tasks.values() if t.enabled]),
+            'active_executions': len(self.active_task_executions),
             'tasks': {name: task.to_dict() for name, task in self.tasks.items()}
         }
     
@@ -281,8 +336,6 @@ def setup_default_tasks(scheduler: TaskScheduler, bot_components: Dict):
                 logger.debug("Position monitoring: Tidak ada active positions")
     
     async def periodic_gc():
-        # Periodic GC setiap 5 menit untuk mengurangi memory footprint
-        # HANYA gunakan periodic GC, bukan per-operation GC, untuk menghindari excessive pause time
         gc.collect()
         logger.debug("Periodic garbage collection completed")
     

@@ -28,6 +28,7 @@ class TradingBot:
         self.monitoring = False
         self.monitoring_chats = []
         self.signal_lock = asyncio.Lock()
+        self.monitoring_tasks = []
         
     def is_authorized(self, user_id: int) -> bool:
         if self.user_manager:
@@ -145,7 +146,8 @@ class TradingBot:
         if chat_id not in self.monitoring_chats:
             self.monitoring_chats.append(chat_id)
             await update.message.reply_text("✅ Monitoring dimulai! Bot akan mendeteksi sinyal secara real-time...")
-            asyncio.create_task(self._monitoring_loop(chat_id))
+            task = asyncio.create_task(self._monitoring_loop(chat_id))
+            self.monitoring_tasks.append(task)
     
     async def auto_start_monitoring(self, chat_ids: List[int]):
         if not self.monitoring:
@@ -155,7 +157,8 @@ class TradingBot:
             if chat_id not in self.monitoring_chats:
                 self.monitoring_chats.append(chat_id)
                 logger.info(f"Auto-starting monitoring for chat {mask_user_id(chat_id)}")
-                asyncio.create_task(self._monitoring_loop(chat_id))
+                task = asyncio.create_task(self._monitoring_loop(chat_id))
+                self.monitoring_tasks.append(task)
     
     async def stopmonitor_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_authorized(update.effective_user.id):
@@ -228,6 +231,9 @@ class TradingBot:
                                         if self.user_manager:
                                             self.user_manager.update_user_activity(chat_id)
                     
+                except asyncio.CancelledError:
+                    logger.info(f"Monitoring loop cancelled for user {mask_user_id(chat_id)}")
+                    break
                 except Exception as e:
                     logger.error(f"Error processing tick dalam monitoring loop: {e}")
                     await asyncio.sleep(1)
@@ -518,16 +524,24 @@ class TradingBot:
                 )
                 return
             
-            await update.message.reply_text("🔍 Menganalisis chart untuk sinyal manual...")
+            can_trade, rejection_reason = self.risk_manager.can_trade(user_id, 'ANY')
+            
+            if not can_trade:
+                await update.message.reply_text(
+                    f"⛔ *Tidak Bisa Trading*\n\n{rejection_reason}",
+                    parse_mode='Markdown'
+                )
+                return
             
             df_m1 = await self.market_data.get_historical_data('M1', 100)
             
             if df_m1 is None or len(df_m1) < 30:
                 await update.message.reply_text(
-                    f"❌ Tidak cukup data candles!\n"
-                    f"Tersedia: {len(df_m1) if df_m1 is not None else 0} candles\n"
-                    f"Dibutuhkan: 30 candles minimum\n\n"
-                    "Tunggu beberapa menit lagi untuk bot build candles."
+                    "⚠️ *Data Tidak Cukup*\n\n"
+                    "Belum cukup data candle untuk analisis.\n"
+                    f"Candles: {len(df_m1) if df_m1 is not None else 0}/30\n\n"
+                    "Tunggu beberapa saat dan coba lagi.",
+                    parse_mode='Markdown'
                 )
                 return
             
@@ -536,18 +550,29 @@ class TradingBot:
             indicators = indicator_engine.get_indicators(df_m1)
             
             if not indicators:
-                await update.message.reply_text("❌ Gagal menghitung indikator. Coba lagi.")
+                await update.message.reply_text(
+                    "⚠️ *Analisis Gagal*\n\n"
+                    "Tidak dapat menghitung indikator.\n"
+                    "Coba lagi nanti.",
+                    parse_mode='Markdown'
+                )
                 return
             
             signal = self.strategy.detect_signal(indicators, 'M1', signal_source='manual')
             
             if not signal:
-                await update.message.reply_text(
-                    "❌ *Tidak Ada Sinyal Saat Ini*\n\n"
-                    "Kondisi market tidak memenuhi kriteria strategi.\n"
-                    "Silakan coba lagi nanti atau gunakan /monitor untuk deteksi otomatis.",
-                    parse_mode='Markdown'
+                trend_strength = indicators.get('trend_strength', 'UNKNOWN')
+                current_price = await self.market_data.get_current_price()
+                
+                msg = (
+                    "⚠️ *Tidak Ada Sinyal*\n\n"
+                    "Kondisi market saat ini tidak memenuhi kriteria trading.\n\n"
+                    f"*Market Info:*\n"
+                    f"Price: ${current_price:.2f}\n"
+                    f"Trend: {trend_strength}\n\n"
+                    "Gunakan /monitor untuk auto-detect sinyal."
                 )
+                await update.message.reply_text(msg, parse_mode='Markdown')
                 return
             
             current_price = await self.market_data.get_current_price()
@@ -558,267 +583,185 @@ class TradingBot:
             
             if not is_valid:
                 await update.message.reply_text(
-                    f"⚠️ *Sinyal Tidak Valid*\n\n"
-                    f"Alasan: {validation_msg}\n\n"
-                    f"Signal: {signal['signal']}\n"
-                    f"Entry: ${signal['entry_price']:.2f}\n"
-                    f"SL: ${signal['stop_loss']:.2f}\n"
-                    f"TP: ${signal['take_profit']:.2f}",
+                    f"⚠️ *Sinyal Tidak Valid*\n\n{validation_msg}",
                     parse_mode='Markdown'
                 )
                 return
             
-            chat_id = update.effective_chat.id
-            async with self.signal_lock:
-                await self._send_signal(user_id, chat_id, signal, df_m1)
+            await self._send_signal(user_id, update.effective_chat.id, signal, df_m1)
+            self.risk_manager.record_signal(user_id)
             
-            logger.info(f"Manual signal sent to user {mask_user_id(user_id)}: {signal['signal']}")
+            if self.user_manager:
+                self.user_manager.update_user_activity(user_id)
             
         except Exception as e:
-            logger.error(f"Error in getsignal_command: {e}")
-            await update.message.reply_text(f"❌ Error: {str(e)}")
+            logger.error(f"Error generating manual signal: {e}")
+            await update.message.reply_text("❌ Error membuat sinyal. Coba lagi nanti.")
     
     async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_authorized(update.effective_user.id):
             return
         
         msg = (
-            "⚙️ *Konfigurasi Bot*\n\n"
-            f"*Mode:* {'DRY RUN' if self.config.DRY_RUN else 'LIVE'}\n\n"
-            "*Indikator:*\n"
-            f"EMA Periods: {', '.join(map(str, self.config.EMA_PERIODS))}\n"
-            f"RSI Period: {self.config.RSI_PERIOD}\n"
-            f"ATR Period: {self.config.ATR_PERIOD}\n\n"
-            "*Risk Management:*\n"
-            f"Max Trades/Day: Unlimited (24/7)\n"
-            f"Daily Loss Limit: {self.config.DAILY_LOSS_PERCENT}%\n"
-            f"Signal Cooldown: {self.config.SIGNAL_COOLDOWN_SECONDS}s\n"
-            f"SL ATR Multiplier: {self.config.SL_ATR_MULTIPLIER}x\n"
-            f"TP/RR Ratio: {self.config.TP_RR_RATIO}x\n\n"
-            "*Position:*\n"
-            f"Lot Size: {self.config.LOT_SIZE}\n"
-            f"Max Spread: {self.config.MAX_SPREAD_PIPS} pips\n"
+            "⚙️ *Bot Configuration*\n\n"
+            f"*Mode:* {'DRY RUN' if self.config.DRY_RUN else 'LIVE'}\n"
+            f"*Lot Size:* {self.config.LOT_SIZE:.2f}\n"
+            f"*Fixed Risk:* ${self.config.FIXED_RISK_AMOUNT:.2f}\n"
+            f"*Daily Loss Limit:* {self.config.DAILY_LOSS_PERCENT}%\n"
+            f"*Signal Cooldown:* {self.config.SIGNAL_COOLDOWN_SECONDS}s\n"
+            f"*Trailing Stop Threshold:* ${self.config.TRAILING_STOP_PROFIT_THRESHOLD:.2f}\n"
+            f"*Breakeven Threshold:* ${self.config.BREAKEVEN_PROFIT_THRESHOLD:.2f}\n\n"
+            f"*EMA Periods:* {', '.join(map(str, self.config.EMA_PERIODS))}\n"
+            f"*RSI Period:* {self.config.RSI_PERIOD}\n"
+            f"*ATR Period:* {self.config.ATR_PERIOD}\n"
         )
         
         await update.message.reply_text(msg, parse_mode='Markdown')
     
     async def langganan_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if self.user_manager:
-            self.user_manager.create_user(
-                telegram_id=update.effective_user.id,
-                username=update.effective_user.username,
-                first_name=update.effective_user.first_name,
-                last_name=update.effective_user.last_name
-            )
+        user_id = update.effective_user.id
         
-        if not self.is_authorized(update.effective_user.id):
-            expired_msg = (
-                "⛔ *Akses Ditolak*\n\n"
-                "Anda tidak memiliki akses ke bot ini atau masa trial Anda telah berakhir.\n\n"
-                "💎 *Untuk menggunakan bot:*\n"
-                "Hubungi admin untuk upgrade ke premium:\n"
-                "@dzeckyete\n\n"
-                "*Paket Premium:*\n"
-                "• 1 Minggu: Rp 15.000\n"
-                "• 1 Bulan: Rp 30.000\n\n"
-                "Setelah pembayaran, admin akan mengaktifkan akses Anda."
-            )
-            await update.message.reply_text(expired_msg, parse_mode='Markdown')
+        if not self.user_manager:
+            msg = "📊 *Status Langganan*\n\nUser management tidak tersedia."
+            await update.message.reply_text(msg, parse_mode='Markdown')
             return
         
-        if self.user_manager:
-            status = self.user_manager.get_subscription_status(update.effective_user.id)
-            
-            if status:
-                if status['tier'] == 'ADMIN':
-                    msg = (
-                        "💎 *Status Langganan*\n\n"
-                        f"👑 Tier: {status['tier']}\n"
-                        f"✅ Status: {status['status']}\n\n"
-                        "Anda memiliki akses unlimited sebagai admin!"
-                    )
-                elif status['status'] == 'Aktif':
-                    msg = (
-                        "💎 *Status Langganan*\n\n"
-                        f"📦 Tier: {status['tier']}\n"
-                        f"✅ Status: {status['status']}\n"
-                        f"📅 Berakhir: {status['expires']}\n"
-                        f"⏰ Sisa: {status['days_left']} hari\n\n"
-                        "Untuk perpanjang, hubungi @dzeckyete"
-                    )
-                else:
-                    msg = (
-                        "💎 *Status Langganan*\n\n"
-                        f"📦 Tier: {status['tier']}\n"
-                        f"❌ Status: {status['status']}\n\n"
-                        "*Paket Premium:*\n"
-                        "• 1 Minggu: Rp 15.000\n"
-                        "• 1 Bulan: Rp 30.000\n\n"
-                        "Hubungi @dzeckyete untuk berlangganan!"
-                    )
+        user = self.user_manager.get_user(user_id)
+        
+        if not user:
+            msg = (
+                "⚠️ *User Tidak Terdaftar*\n\n"
+                "Gunakan /start untuk mendaftar.\n"
+            )
+            await update.message.reply_text(msg, parse_mode='Markdown')
+            return
+        
+        if user.is_admin:
+            msg = (
+                "👑 *Status Langganan*\n\n"
+                "Tipe: ADMIN (Unlimited)\n"
+                "Akses: Penuh & Permanen\n"
+            )
+        elif user.access_level == 'premium':
+            expires_at = user.subscription_expires_at
+            if expires_at:
+                jakarta_tz = pytz.timezone('Asia/Jakarta')
+                expires_local = expires_at.replace(tzinfo=pytz.UTC).astimezone(jakarta_tz)
+                days_left = (expires_at - datetime.utcnow()).days
                 
-                await update.message.reply_text(msg, parse_mode='Markdown')
+                msg = (
+                    "💎 *Status Langganan*\n\n"
+                    f"Tipe: PREMIUM\n"
+                    f"Berakhir: {expires_local.strftime('%d/%m/%Y %H:%M')}\n"
+                    f"Sisa: {days_left} hari\n"
+                )
             else:
-                await update.message.reply_text("❌ Gagal mengambil status langganan.")
+                msg = "💎 *Status Langganan*\n\nTipe: PREMIUM (Tanpa batas waktu)\n"
         else:
-            await update.message.reply_text("❌ User manager tidak tersedia.")
+            msg = (
+                "⛔ *Status Langganan*\n\n"
+                "Tipe: FREE (Expired)\n\n"
+                "Hubungi @dzeckyete untuk upgrade:\n"
+                "• 1 Minggu: Rp 15.000\n"
+                "• 1 Bulan: Rp 30.000\n"
+            )
+        
+        await update.message.reply_text(msg, parse_mode='Markdown')
     
     async def premium_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await self.langganan_command(update, context)
+        msg = (
+            "💎 *Paket Premium*\n\n"
+            "Dapatkan akses penuh ke XAUUSD Trading Bot:\n\n"
+            "*Harga:*\n"
+            "• 1 Minggu: Rp 15.000\n"
+            "• 1 Bulan: Rp 30.000\n\n"
+            "*Fitur Premium:*\n"
+            "✅ Auto-monitoring 24/7\n"
+            "✅ Sinyal trading real-time\n"
+            "✅ Position tracking otomatis\n"
+            "✅ Analisis multi-timeframe\n"
+            "✅ Chart & statistik lengkap\n\n"
+            "*Cara Berlangganan:*\n"
+            "Hubungi: @dzeckyete\n"
+        )
+        
+        await update.message.reply_text(msg, parse_mode='Markdown')
     
     async def beli_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        msg = (
-            "💎 *Cara Berlangganan Premium*\n\n"
-            "*Paket Tersedia:*\n"
-            "• 1 Minggu: Rp 15.000 (7 hari)\n"
-            "• 1 Bulan: Rp 30.000 (30 hari)\n\n"
-            "*Benefit Premium:*\n"
-            "✅ Unlimited signals 24/7\n"
-            "✅ Auto-monitoring\n"
-            "✅ Position tracking\n"
-            "✅ All premium features\n\n"
-            "*Langkah Berlangganan:*\n"
-            "1. Hubungi admin: @dzeckyete\n"
-            "2. Pilih paket yang diinginkan\n"
-            "3. Lakukan pembayaran\n"
-            "4. Kirim bukti pembayaran\n"
-            "5. Admin akan mengaktifkan akses Anda\n\n"
-            "*Metode Pembayaran:*\n"
-            "Transfer Bank / E-Wallet\n"
-            "(detail akan diberikan admin)\n\n"
-            "📞 Contact: @dzeckyete"
-        )
-        await update.message.reply_text(msg, parse_mode='Markdown')
+        await self.premium_command(update, context)
     
     async def riset_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("⛔ Command ini hanya untuk admin.")
+            await update.message.reply_text("⛔ Perintah ini hanya untuk admin.")
             return
         
         try:
             session = self.db.get_session()
             
-            session.query(Trade).delete()
-            session.query(Position).delete()
-            session.query(Performance).delete()
+            deleted_trades = session.query(Trade).delete()
+            deleted_positions = session.query(Position).delete()
+            deleted_performance = session.query(Performance).delete()
+            
             session.commit()
             session.close()
             
-            self.monitoring_chats.clear()
-            self.monitoring = False
-            
-            if self.position_tracker:
-                self.position_tracker.active_positions.clear()
-            
-            await update.message.reply_text(
-                "✅ *Database trading berhasil direset!*\n\n"
-                "Yang direset:\n"
-                "• Semua riwayat trading (trades)\n"
-                "• Posisi aktif (positions)\n"
-                "• Data performa (performance)\n"
-                "• Monitoring aktif dihentikan\n"
-                "• Sinyal aktif dibatalkan",
-                parse_mode='Markdown'
+            msg = (
+                "✅ *Database Reset Berhasil*\n\n"
+                f"Trades dihapus: {deleted_trades}\n"
+                f"Positions dihapus: {deleted_positions}\n"
+                f"Performance dihapus: {deleted_performance}\n"
             )
-            logger.info(f"Database and monitoring reset by admin: {mask_user_id(update.effective_user.id)}")
+            
+            await update.message.reply_text(msg, parse_mode='Markdown')
+            logger.info(f"Database reset by admin {mask_user_id(update.effective_user.id)}")
             
         except Exception as e:
             logger.error(f"Error resetting database: {e}")
-            await update.message.reply_text(f"❌ Error: {str(e)}")
+            await update.message.reply_text("❌ Error reset database.")
     
     async def addpremium_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        logger.info(f"/addpremium called by user {mask_user_id(update.effective_user.id)}")
-        
         if not self.is_admin(update.effective_user.id):
-            logger.warning(f"Non-admin user {mask_user_id(update.effective_user.id)} tried to use /addpremium")
-            await update.message.reply_text("⛔ Command ini hanya untuk admin.")
+            await update.message.reply_text("⛔ Perintah ini hanya untuk admin.")
             return
         
-        logger.info(f"Admin verified, args: {context.args}")
+        if not self.user_manager:
+            await update.message.reply_text("❌ User manager tidak tersedia.")
+            return
         
         if not context.args or len(context.args) < 2:
-            await update.message.reply_text(
-                "❌ Format salah!\n\n"
-                "*Penggunaan:*\n"
-                "/addpremium <user_id/@username> <durasi>\n\n"
-                "*Durasi:*\n"
-                "• 1week - 1 Minggu\n"
-                "• 1month - 1 Bulan\n\n"
+            msg = (
+                "📝 *Cara Menggunakan:*\n\n"
+                "/addpremium <user_id> <durasi_hari>\n\n"
                 "*Contoh:*\n"
-                "/addpremium 123456789 1month\n"
-                "/addpremium @dzeckyete 1week",
-                parse_mode='Markdown'
+                "/addpremium 123456789 7\n"
+                "/addpremium 123456789 30\n"
             )
+            await update.message.reply_text(msg, parse_mode='Markdown')
             return
         
         try:
-            user_input = context.args[0]
-            duration = context.args[1]
+            target_user_id = int(context.args[0])
+            duration_days = int(context.args[1])
             
-            if duration not in ['1week', '1month']:
-                await update.message.reply_text("❌ Durasi tidak valid! Gunakan: 1week atau 1month")
-                return
+            success = self.user_manager.grant_premium(target_user_id, duration_days)
             
-            target_user_id = None
-            
-            if user_input.startswith('@'):
-                username = user_input[1:]
-                
-                if self.user_manager:
-                    target_user_id = self.user_manager.get_user_by_username(username)
-                
-                if not target_user_id:
-                    await update.message.reply_text(
-                        f"❌ Username @{username} tidak ditemukan!\n\n"
-                        "User harus mengirim /start ke bot terlebih dahulu."
-                    )
-                    return
+            if success:
+                msg = (
+                    "✅ *Premium Berhasil Ditambahkan*\n\n"
+                    f"User ID: {target_user_id}\n"
+                    f"Durasi: {duration_days} hari\n"
+                )
             else:
-                try:
-                    target_user_id = int(user_input)
-                except ValueError:
-                    await update.message.reply_text("❌ Format salah! Gunakan user ID (angka) atau @username")
-                    return
+                msg = "❌ Gagal menambahkan premium. User mungkin belum terdaftar."
             
-            if self.user_manager:
-                self.user_manager.create_user(telegram_id=target_user_id)
-                
-                success = self.user_manager.upgrade_subscription(target_user_id, duration)
-                
-                if success:
-                    status = self.user_manager.get_subscription_status(target_user_id)
-                    
-                    duration_text = "1 Minggu" if duration == '1week' else "1 Bulan"
-                    
-                    msg = (
-                        f"✅ Berhasil menambahkan premium!\n\n"
-                        f"User ID: {target_user_id}\n"
-                        f"Username: @{user_input[1:] if user_input.startswith('@') else 'N/A'}\n"
-                        f"Durasi: {duration_text}\n"
-                        f"Berakhir: {status['expires']}\n"
-                    )
-                    await update.message.reply_text(msg)
-                    logger.info(f"Admin {mask_user_id(update.effective_user.id)} added premium to {mask_user_id(target_user_id)} for {duration}")
-                    
-                    try:
-                        await self.app.bot.send_message(
-                            chat_id=target_user_id,
-                            text=f"🎉 *Selamat!*\n\nAkun Anda telah diupgrade ke premium!\n\n"
-                                 f"Durasi: {duration_text}\n"
-                                 f"Berakhir: {status['expires']}\n\n"
-                                 f"Gunakan /monitor untuk mulai menerima sinyal trading.",
-                            parse_mode='Markdown'
-                        )
-                    except Exception as e:
-                        logger.warning(f"Could not send notification to user {mask_user_id(target_user_id)}: {e}")
-                else:
-                    await update.message.reply_text("❌ Gagal menambahkan premium.")
-            else:
-                await update.message.reply_text("❌ User manager tidak tersedia.")
-                
+            await update.message.reply_text(msg, parse_mode='Markdown')
+            logger.info(f"Premium added to {target_user_id} for {duration_days} days by admin {mask_user_id(update.effective_user.id)}")
+            
+        except ValueError:
+            await update.message.reply_text("❌ Format salah. Gunakan: /addpremium <user_id> <durasi_hari>")
         except Exception as e:
             logger.error(f"Error adding premium: {e}")
-            await update.message.reply_text(f"❌ Error: {str(e)}")
+            await update.message.reply_text("❌ Error menambahkan premium.")
     
     async def initialize(self):
         if not self.config.TELEGRAM_BOT_TOKEN:
@@ -965,6 +908,7 @@ class TradingBot:
                 logger.debug(f"✅ Successfully processed update: {update_id}")
             else:
                 logger.warning("Received invalid or malformed update data")
+                from collections.abc import Mapping
                 if isinstance(parsed_data, Mapping):
                     logger.debug(f"Update data keys: {list(parsed_data.keys())}")
                 
@@ -1009,33 +953,78 @@ class TradingBot:
             logger.info("Telegram bot is running!")
     
     async def stop(self):
+        logger.info("=" * 50)
+        logger.info("STOPPING TELEGRAM BOT")
+        logger.info("=" * 50)
+        
         if not self.app:
+            logger.warning("Bot app not initialized, nothing to stop")
             return
         
-        if self.config.TELEGRAM_WEBHOOK_MODE:
-            logger.info("Stopping Telegram bot webhook...")
+        self.monitoring = False
+        
+        logger.info(f"Cancelling {len(self.monitoring_tasks)} monitoring tasks...")
+        for task in self.monitoring_tasks:
+            if not task.done():
+                task.cancel()
+        
+        if self.monitoring_tasks:
             try:
-                await self.app.bot.delete_webhook()
-                logger.info("Webhook deleted successfully")
+                await asyncio.wait_for(
+                    asyncio.gather(*self.monitoring_tasks, return_exceptions=True),
+                    timeout=5
+                )
+                logger.info("All monitoring tasks cancelled")
+            except asyncio.TimeoutError:
+                logger.warning("Some monitoring tasks did not complete within timeout")
+        
+        self.monitoring_tasks.clear()
+        self.monitoring_chats.clear()
+        
+        if self.config.TELEGRAM_WEBHOOK_MODE:
+            logger.info("Deleting Telegram webhook...")
+            try:
+                await asyncio.wait_for(
+                    self.app.bot.delete_webhook(drop_pending_updates=True),
+                    timeout=5
+                )
+                logger.info("✅ Webhook deleted successfully")
+            except asyncio.TimeoutError:
+                logger.warning("Webhook deletion timed out after 5s")
             except Exception as e:
                 logger.error(f"Error deleting webhook: {e}")
         else:
             logger.info("Stopping Telegram bot polling...")
             try:
                 if self.app.updater and self.app.updater.running:
-                    await self.app.updater.stop()
-                    logger.info("Telegram bot polling stopped")
+                    await asyncio.wait_for(
+                        self.app.updater.stop(),
+                        timeout=5
+                    )
+                    logger.info("✅ Telegram bot polling stopped")
+            except asyncio.TimeoutError:
+                logger.warning("Updater stop timed out after 5s")
             except Exception as e:
                 logger.error(f"Error stopping updater: {e}")
         
+        logger.info("Stopping Telegram application...")
         try:
-            await self.app.stop()
-            logger.info("Telegram bot application stopped")
+            await asyncio.wait_for(self.app.stop(), timeout=5)
+            logger.info("✅ Telegram application stopped")
+        except asyncio.TimeoutError:
+            logger.warning("App stop timed out after 5s")
         except Exception as e:
             logger.error(f"Error stopping app: {e}")
         
+        logger.info("Shutting down Telegram application...")
         try:
-            await self.app.shutdown()
-            logger.info("Telegram bot application shutdown complete")
+            await asyncio.wait_for(self.app.shutdown(), timeout=5)
+            logger.info("✅ Telegram application shutdown complete")
+        except asyncio.TimeoutError:
+            logger.warning("App shutdown timed out after 5s")
         except Exception as e:
             logger.error(f"Error shutting down app: {e}")
+        
+        logger.info("=" * 50)
+        logger.info("TELEGRAM BOT STOPPED")
+        logger.info("=" * 50)

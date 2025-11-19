@@ -63,7 +63,51 @@ The bot's architecture is modular, designed for scalability and maintainability.
 -   **Free Tier Optimization (Nov 2025):** Optimized untuk Koyeb free tier dengan FREE_TIER_MODE, tick logging sampling (30x reduction), single-threaded chart generation, dan periodic garbage collection untuk reduce CPU/memory usage.
 
 ## Recent Changes (November 19, 2025)
-**V2.5 - Free Tier Optimization** (Latest)
+**V2.6 - Graceful Shutdown Fix untuk Koyeb** (Latest)
+
+1. ✅ **Signal Handler Perbaikan** (main.py):
+   - Menggunakan `asyncio.Event()` untuk shutdown signal (kompatibel Linux/Koyeb)
+   - Mengganti `loop.call_soon_threadsafe()` yang bermasalah dengan SIGTERM
+   - Shutdown sequence yang lebih clean dan reliable
+
+2. ✅ **Task Tracking & Cancellation** (main.py):
+   - Menambahkan `tracked_tasks[]` untuk melacak semua async tasks
+   - Proper cancellation untuk market_task, position_task, bot_task dengan timeout
+   - Semua tasks di-await sampai selesai atau timeout
+
+3. ✅ **Timeout Shutdown Diperpanjang** (main.py):
+   - Meningkatkan timeout dari 10 detik → **28 detik** (sesuai standar Koyeb 30s)
+   - Per-component timeout: 5-8 detik per operasi
+   - Total shutdown maksimal: 28 detik sebelum force exit
+
+4. ✅ **Force Exit Mechanism** (main.py):
+   - Menambahkan `os._exit(0)` jika graceful shutdown melebihi timeout
+   - Mencegah zombie process dan hanging di Koyeb
+   - Bot pasti keluar dengan clean exit code 0
+
+5. ✅ **Telegram Bot Shutdown** (bot/telegram_bot.py):
+   - Tracking `monitoring_tasks[]` untuk semua monitoring loops
+   - Proper cancellation monitoring tasks sebelum stop app
+   - Webhook cleanup dengan `delete_webhook(drop_pending_updates=True)` + timeout 5s
+   - Sequential shutdown: Cancel monitoring → Delete webhook → Stop app → Shutdown app
+
+6. ✅ **Task Scheduler Shutdown** (bot/task_scheduler.py):
+   - Tracking `active_task_executions[]` untuk semua running tasks
+   - Cancel scheduler loop dengan proper timeout (3s)
+   - Cancel semua active tasks dengan timeout (5s)
+   - Clean callback system untuk auto-remove completed tasks
+
+7. ✅ **Logging Detail untuk Debugging**:
+   - Setiap tahap shutdown tercatat dengan jelas
+   - Logging durasi shutdown actual vs timeout
+   - Warning jika ada operasi yang timeout
+   - Error logs dengan context lengkap
+
+**Impact:** Bot sekarang shutdown dengan benar di Koyeb, merespons SIGTERM, cancel semua tasks, hapus webhook, dan exit dengan clean tanpa zombie process.
+
+---
+
+**V2.5 - Free Tier Optimization**
 
 1. ✅ **FREE_TIER_MODE Configuration** (config.py):
    - Added `FREE_TIER_MODE` flag (default: true) untuk optimize resource usage
