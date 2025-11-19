@@ -76,9 +76,10 @@ Bot trading otomatis untuk XAUUSD (Gold) dengan Telegram integration, dual-mode 
 👑 PREMIUM
 /premium     - Info paket subscription
 /beli        - Cara langganan premium
+/langganan   - Cek status langganan
 
 🔧 ADMIN ONLY
-/riset       - Reset database trading
+/riset       - Reset database trading & monitoring
 /addpremium  - Tambah user premium
 ```
 
@@ -206,6 +207,54 @@ Auto-cleanup setelah 60 menit untuk hemat storage.
 **Cara Beli:** Hubungi @dzeckyete di Telegram
 
 **Admin:** Akses unlimited selamanya
+
+## 🔧 Admin Commands
+
+Bot menyediakan command khusus untuk admin untuk mengelola user dan database:
+
+### /riset - Reset Database Trading
+
+Command ini akan mereset seluruh database trading dan menghentikan semua aktivitas monitoring.
+
+**Yang direset:**
+- ✅ Semua riwayat trading (trades)
+- ✅ Posisi aktif (positions)
+- ✅ Data performa (performance)
+- ✅ Monitoring aktif dihentikan
+- ✅ Sinyal aktif dibatalkan
+
+**Contoh penggunaan:**
+```
+/riset
+```
+
+**Catatan:** Command ini hanya bisa digunakan oleh admin dan akan membersihkan semua data trading. Gunakan dengan hati-hati!
+
+### /addpremium - Tambah User Premium
+
+Command ini digunakan untuk memberikan akses premium kepada user.
+
+**Format:**
+```
+/addpremium <user_id/@username> <durasi>
+```
+
+**Durasi yang tersedia:**
+- `1week` - 1 Minggu (7 hari)
+- `1month` - 1 Bulan (30 hari)
+
+**Contoh penggunaan:**
+```
+/addpremium 123456789 1month
+/addpremium @dzeckyete 1week
+```
+
+**Cara kerja:**
+1. Bot akan mencari user berdasarkan ID atau username
+2. Jika user belum terdaftar, bot akan otomatis membuat akun
+3. Subscription akan ditambahkan sesuai durasi yang dipilih
+4. User akan menerima notifikasi tentang upgrade premium
+5. Admin akan menerima konfirmasi beserta detail subscription
 
 ## 📈 Performance Tracking
 

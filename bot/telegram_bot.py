@@ -663,6 +663,33 @@ class TradingBot:
         else:
             await update.message.reply_text("❌ User manager tidak tersedia.")
     
+    async def premium_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await self.langganan_command(update, context)
+    
+    async def beli_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        msg = (
+            "💎 *Cara Berlangganan Premium*\n\n"
+            "*Paket Tersedia:*\n"
+            "• 1 Minggu: Rp 15.000 (7 hari)\n"
+            "• 1 Bulan: Rp 30.000 (30 hari)\n\n"
+            "*Benefit Premium:*\n"
+            "✅ Unlimited signals 24/7\n"
+            "✅ Auto-monitoring\n"
+            "✅ Position tracking\n"
+            "✅ All premium features\n\n"
+            "*Langkah Berlangganan:*\n"
+            "1. Hubungi admin: @dzeckyete\n"
+            "2. Pilih paket yang diinginkan\n"
+            "3. Lakukan pembayaran\n"
+            "4. Kirim bukti pembayaran\n"
+            "5. Admin akan mengaktifkan akses Anda\n\n"
+            "*Metode Pembayaran:*\n"
+            "Transfer Bank / E-Wallet\n"
+            "(detail akan diberikan admin)\n\n"
+            "📞 Contact: @dzeckyete"
+        )
+        await update.message.reply_text(msg, parse_mode='Markdown')
+    
     async def riset_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_admin(update.effective_user.id):
             await update.message.reply_text("⛔ Command ini hanya untuk admin.")
@@ -677,8 +704,23 @@ class TradingBot:
             session.commit()
             session.close()
             
-            await update.message.reply_text("✅ Database trading berhasil direset!")
-            logger.info(f"Database reset by admin: {mask_user_id(update.effective_user.id)}")
+            self.monitoring_chats.clear()
+            self.monitoring = False
+            
+            if self.position_tracker:
+                self.position_tracker.active_positions.clear()
+            
+            await update.message.reply_text(
+                "✅ *Database trading berhasil direset!*\n\n"
+                "Yang direset:\n"
+                "• Semua riwayat trading (trades)\n"
+                "• Posisi aktif (positions)\n"
+                "• Data performa (performance)\n"
+                "• Monitoring aktif dihentikan\n"
+                "• Sinyal aktif dibatalkan",
+                parse_mode='Markdown'
+            )
+            logger.info(f"Database and monitoring reset by admin: {mask_user_id(update.effective_user.id)}")
             
         except Exception as e:
             logger.error(f"Error resetting database: {e}")
@@ -788,6 +830,8 @@ class TradingBot:
         self.app.add_handler(CommandHandler("start", self.start_command))
         self.app.add_handler(CommandHandler("help", self.help_command))
         self.app.add_handler(CommandHandler("langganan", self.langganan_command))
+        self.app.add_handler(CommandHandler("premium", self.premium_command))
+        self.app.add_handler(CommandHandler("beli", self.beli_command))
         self.app.add_handler(CommandHandler("monitor", self.monitor_command))
         self.app.add_handler(CommandHandler("stopmonitor", self.stopmonitor_command))
         self.app.add_handler(CommandHandler("getsignal", self.getsignal_command))

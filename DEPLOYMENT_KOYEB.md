@@ -39,6 +39,20 @@ TELEGRAM_BOT_TOKEN=<token dari @BotFather>
 AUTHORIZED_USER_IDS=<user ID Telegram Anda>
 ```
 
+**WEBHOOK MODE (Recommended untuk Koyeb):**
+```
+TELEGRAM_WEBHOOK_MODE=true
+WEBHOOK_URL=https://<your-koyeb-domain>/bot<TELEGRAM_BOT_TOKEN>
+```
+
+**Catatan Webhook:**
+- ✅ Webhook mode lebih efisien dan reliable untuk deployment cloud
+- ✅ Bot akan auto-detect Koyeb domain jika `WEBHOOK_URL` tidak diset
+- ✅ Pastikan `TELEGRAM_WEBHOOK_MODE=true` untuk enable webhook
+- ✅ Server otomatis listen ke PORT dari environment Koyeb
+- ✅ Healthcheck endpoint: `/health` (port 8080)
+- ✅ Webhook endpoint: `/bot<token>` (auto-registered)
+
 **Optional (sudah ada default yang bagus):**
 ```
 EMA_PERIODS=5,10,20
@@ -61,11 +75,18 @@ FIXED_RISK_AMOUNT=1.0
 - **Regions**: Pilih region terdekat (e.g., Frankfurt, Singapore)
 - **Scaling**: 1 instance (cukup untuk bot)
 
-### 6. Health Check (Optional tapi Recommended)
+### 6. Health Check (Wajib)
 
 - **Health check port**: `8080`
 - **Health check path**: `/health`
 - **Health check protocol**: HTTP
+
+**Status yang dicek:**
+- ✅ Market data connection
+- ✅ Database status
+- ✅ Telegram bot status
+- ✅ Task scheduler status
+- ✅ Webhook mode status
 
 ### 7. Deploy!
 
@@ -96,6 +117,22 @@ FIXED_RISK_AMOUNT=1.0
    ```
 
 ## 🔍 Troubleshooting
+
+### Webhook Mode Tidak Aktif
+
+**Problem**: Logs menunjukkan "Webhook mode: FALSE" di health check
+**Solusi:**
+1. Pastikan environment variable `TELEGRAM_WEBHOOK_MODE=true` sudah diset
+2. Set `WEBHOOK_URL` atau biarkan auto-detect Koyeb domain
+3. Restart service di Koyeb Dashboard
+4. Check logs untuk konfirmasi: "✅ Webhook configured successfully!"
+5. Test dengan mengirim pesan ke bot di Telegram
+
+**Verifikasi webhook aktif:**
+```
+curl https://<your-koyeb-domain>/health
+```
+Response harus menunjukkan `"webhook_mode": true`
 
 ### Docker Build Failed - libgl1-mesa-glx Error
 
@@ -150,8 +187,10 @@ FIXED_RISK_AMOUNT=1.0
 /settings    - Lihat konfigurasi bot
 ```
 
-## 🎯 Fitur Bot (UPDATED v2.0)
+## 🎯 Fitur Bot (UPDATED v2.4)
 
+- ✅ **Webhook Mode** - Telegram webhook untuk Koyeb deployment
+- ✅ **Auto-detect domain** - Otomatis detect Koyeb/Replit domain
 - ✅ **Real-time data** dari Deriv (XAUUSD/Gold)
 - ✅ **Zero API key** required untuk market data
 - ✅ **Dual signal modes**: 🤖 Auto (strict) & 👤 Manual (relaxed)
@@ -162,6 +201,8 @@ FIXED_RISK_AMOUNT=1.0
 - ✅ **Risk management** dengan cooldown & daily loss limit
 - ✅ **24/7 monitoring** tanpa henti
 - ✅ **Signal source tracking**: Setiap sinyal ter-label sumbernya
+- ✅ **Premium subscription**: Weekly & Monthly packages
+- ✅ **Admin commands**: User management & database control
 
 ## 🆓 Free Tier Limits
 
