@@ -1,0 +1,83 @@
+Bantu perbaiki lihat poto ini,bot nya shutdown tetapi consol koyeb masih berjalan, kemungkinan ini pasti dari kodenya ya bukan dari koyeb nya
+
+Perbaiki project ini agar bot Telegram yang berjalan di Koyeb bisa shutdown dengan benar. Saat ini, terjadi masalah:
+
+Bot tidak merespons SIGTERM/SIGINT
+
+Koyeb menunjukkan bot masih running meskipun sudah dihentikan
+
+Bot tidak melakukan graceful shutdown
+
+Background tasks tetap hidup sehingga proses tidak pernah benar-benar berhenti
+
+
+Fokus utama perbaikan:
+
+1. Perbaiki signal handler di main.py agar kompatibel dengan lingkungan Linux/Koyeb.
+
+
+2. Bot harus menangkap SIGTERM dari Koyeb dan memicu shutdown secara benar.
+
+
+3. Semua task async yang berjalan (market data, position monitoring, telegram bot task, scheduler, dll.) harus ditrack, di-cancel, dan di-await sampai selesai.
+
+
+4. Tambahkan timeout shutdown maksimum 25–30 detik (standar Koyeb).
+
+
+5. Pastikan server healthcheck (misalnya FastAPI/Flask/Hypercorn/Uvicorn) ikut dihentikan dengan benar.
+
+
+6. Pastikan webhook Telegram dibersihkan saat shutdown (deleteWebhook).
+
+
+7. Jika graceful shutdown gagal / timeout — lakukan force exit (os._exit(0)).
+
+
+
+File yang perlu diperbaiki:
+
+main.py → perbaiki signal handler & global shutdown sequence
+
+bot/telegram_bot.py → perbaiki stop/shutdown bot + webhook cleanup
+
+bot/task_scheduler.py → pastikan scheduler bisa berhenti bersih
+
+
+Expected behavior setelah perbaikan:
+
+1. Koyeb kirim SIGTERM → bot menerima → shutdown dimulai
+
+
+2. Semua asyncio tasks dicancel dan ditunggu
+
+
+3. Webhook Telegram dihapus
+
+
+4. Health server dimatikan
+
+
+5. Proses keluar dengan exit code 0
+
+
+6. Tidak ada task yang menggantung, tidak ada zombie log, tidak ada proses yang tetap hidup
+
+
+
+Tambahkan juga:
+
+Logging detail untuk setiap tahap shutdown
+
+Perlindungan agar shutdown tidak dipanggil dua kali
+
+Mekanisme self.running = False agar semua loop berhenti
+
+
+Output yang saya butuhkan:
+✔ Berikan ulang ketiga file tersebut (main.py, bot/telegram_bot.py, bot/task_scheduler.py) dalam versi lengkap TANPA potongan kode (…)
+✔ Perbaiki langsung semua fungsi shutdown & signal handling
+✔ Pastikan kode final siap deploy ke Koyeb
+
+
+---
