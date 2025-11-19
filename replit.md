@@ -61,10 +61,43 @@ The bot's architecture is modular, designed for scalability and maintainability.
 -   **Real-time Processing:** Utilizes WebSocket for live tick data from Deriv.
 -   **Asynchronous Operations:** Leverages `asyncio` for efficient handling of concurrent tasks (WebSocket, Telegram, position tracking).
 -   **Database:** SQLite for lightweight, embedded data storage with auto-migration support.
--   **Deployment:** Designed for Koyeb and Replit, with Dockerfile using Debian Trixie compatible libraries (`libgl1` instead of `libgl1-mesa-glx`).
+-   **Deployment:** Designed for Koyeb and Replit deployments:
+    -   HTTP server using `aiohttp` for health checks and webhook
+    -   PORT environment variable support (Koyeb standard)
+    -   Root `/` and `/health` endpoints for healthcheck
+    -   `/webhook` endpoint for Telegram webhook mode
+    -   Auto-webhook setup on startup when webhook mode enabled
+    -   Dockerfile using Debian Trixie compatible libraries (`libgl1` instead of `libgl1-mesa-glx`)
+    -   Complete deployment guide available in `KOYEB_DEPLOYMENT.md`
 
-## Recent Changes (V2.6 - Webhook & Deployment Enhancements)
-**Date:** November 18, 2025 (Latest)
+## Recent Changes (V2.7 - Koyeb Deployment Support)
+**Date:** November 19, 2025 (Latest)
+
+**Major Enhancement: Full Koyeb Deployment Compatibility**
+1. **PORT Environment Variable Support (config.py):**
+   - Changed `HEALTH_CHECK_PORT` to use `PORT` environment variable (Koyeb standard)
+   - Fallback ke 8080 jika PORT tidak tersedia
+   - Kompatibel dengan cloud platforms yang menggunakan dynamic port assignment
+
+2. **Root Healthcheck Endpoint (main.py):**
+   - Added route `/` yang return response sama dengan `/health`
+   - Koyeb dan cloud platforms lain dapat check health di root path
+   - Tetap support `/health` endpoint untuk backward compatibility
+
+3. **Auto-Setup Webhook (main.py):**
+   - Automatic webhook configuration saat startup jika `TELEGRAM_WEBHOOK_MODE=true`
+   - Calls `telegram_bot.setup_webhook()` setelah bot initialized
+   - Includes retry logic dan comprehensive error handling
+   - Eliminates manual webhook setup requirement
+
+4. **Deployment Documentation (KOYEB_DEPLOYMENT.md):**
+   - Complete step-by-step guide untuk deploy ke Koyeb
+   - Environment variables reference dan troubleshooting
+   - Verification steps dan health check testing
+   - Production-ready deployment checklist
+
+**V2.6 Changes (Webhook & Deployment Enhancements):**
+**Date:** November 18, 2025
 
 **Major Enhancement: Production-Ready Webhook Support for Replit Deployment**
 1. **Webhook Configuration Validation (config.py):**
