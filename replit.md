@@ -51,13 +51,40 @@ The bot's architecture is modular, designed for scalability and maintainability.
     -   **Tracking Fields:** Database tracks original_sl, sl_adjustment_count, max_profit_reached, last_price_update for each position.
     -   **/status Command:** Shows detailed position info including Original SL vs Current SL, Trailing Stop status, Max profit reached, and SL adjustment count.
 -   **Subscription System:** Weekly and Monthly premium packages with automatic expiry. Admin access is unlimited.
--   **Admin Commands:** `/riset` (reset trading database), `/addpremium <user_id> <duration>`, `/status` (detailed position tracking).
+-   **Admin Commands:** `/riset` (reset trading database + monitoring state), `/addpremium <user_id/@username> <duration>`, `/status` (detailed position tracking).
+-   **User Commands:** `/premium` & `/beli` untuk informasi subscription, `/langganan` untuk check status.
 -   **Anti-Duplicate Protection:** Prevents new signals if an active position exists for a user.
 -   **Auto-Monitoring & Auto-Build Candles:** Bot automatically starts monitoring and ensures sufficient historical candles are built at startup.
 -   **Chart Generation:** Uses `mplfinance` and `matplotlib` for multi-panel charts.
 -   **Database Migration:** Auto-migration system checks and adds new columns on startup, ensuring backward compatibility. Includes backfill logic for existing positions.
 -   **Multi-User Support:** Implements per-user position tracking, risk management, and separate data storage within the database.
 -   **Deployment:** Designed for Koyeb and Replit deployments, featuring an HTTP server for health checks and webhooks with `/bot<token>` endpoint format, PORT environment variable support, and automatic webhook setup.
+-   **Webhook Mode (Nov 2025):** Full webhook support untuk Telegram dengan auto-detect domain, endpoint `/bot<token>`, dan auto-setup saat start. Enable dengan `TELEGRAM_WEBHOOK_MODE=true`.
+
+## Recent Changes (November 19, 2025)
+**V2.4 - Webhook Mode & Documentation Sync**
+
+1. ✅ **Webhook Mode Implementation**:
+   - Added full Telegram webhook support untuk Koyeb deployment
+   - Auto-detect webhook URL dari environment (Koyeb/Replit domains)
+   - Server otomatis listen ke PORT dari environment
+   - Webhook endpoint `/bot<token>` dan healthcheck `/health` tersedia
+   - Enable dengan environment variable `TELEGRAM_WEBHOOK_MODE=true`
+
+2. ✅ **New Commands**:
+   - `/premium` - Alias untuk `/langganan` (cek status subscription)
+   - `/beli` - Instruksi lengkap cara berlangganan premium
+
+3. ✅ **Enhanced Admin Commands**:
+   - `/riset` sekarang juga reset monitoring state dan active signals
+   - Clear monitoring_chats, monitoring flag, dan active_positions
+   - Response message lebih informatif tentang apa saja yang direset
+
+4. ✅ **Documentation Updates**:
+   - README.md: Dokumentasi lengkap command /premium, /beli, /riset dengan contoh
+   - DEPLOYMENT_KOYEB.md: Panduan webhook mode untuk Koyeb dengan troubleshooting
+   - Admin commands section dengan format dan contoh penggunaan lengkap
+   - Pricing konsisten di semua dokumentasi: 1 Minggu Rp 15.000, 1 Bulan Rp 30.000
 
 ## External Dependencies
 -   **Deriv WebSocket API:** For real-time XAUUSD market data.
