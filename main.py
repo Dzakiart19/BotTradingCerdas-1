@@ -418,7 +418,8 @@ class TradingBotOrchestrator:
         self.running = False
         shutdown_timeout = 28
         
-        shutdown_start_time = asyncio.get_event_loop().time()
+        loop = asyncio.get_running_loop()
+        shutdown_start_time = loop.time()
         
         try:
             if self.telegram_bot and self.telegram_bot.app and self.config.AUTHORIZED_USER_IDS:
@@ -517,49 +518,64 @@ class TradingBotOrchestrator:
                 except Exception as e:
                     logger.error(f"Error stopping health server: {e}")
             
-            shutdown_duration = asyncio.get_event_loop().time() - shutdown_start_time
+            shutdown_duration = loop.time() - shutdown_start_time
             logger.info(f"Shutdown completed in {shutdown_duration:.2f}s")
+            
+            if shutdown_duration > shutdown_timeout:
+                logger.warning(f"Graceful shutdown exceeded timeout ({shutdown_duration:.2f}s > {shutdown_timeout}s)")
+            
             logger.info("=" * 60)
             logger.info("BOT SHUTDOWN COMPLETE")
             logger.info("=" * 60)
             
+            import logging
+            logging.shutdown()
+            
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
+            import logging
+            logging.shutdown()
+            raise
         finally:
             self.shutdown_in_progress = False
-            
-            elapsed = asyncio.get_event_loop().time() - shutdown_start_time
-            if elapsed > shutdown_timeout:
-                logger.warning(f"Graceful shutdown exceeded timeout ({elapsed:.2f}s > {shutdown_timeout}s)")
-                logger.warning("Forcing exit...")
-                os._exit(0)
 
 async def main():
     orchestrator = TradingBotOrchestrator()
+    loop = asyncio.get_running_loop()
     
     def signal_handler(sig, frame):
         signame = signal.Signals(sig).name
         logger.info(f"Received signal {signame} ({sig})")
-        orchestrator.shutdown_event.set()
+        try:
+            loop.call_soon_threadsafe(orchestrator.shutdown_event.set)
+        except RuntimeError:
+            pass
     
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
     try:
         await orchestrator.start()
+        return 0
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received")
+        return 0
     except Exception as e:
         logger.error(f"Unhandled exception in main: {e}")
+        return 1
     finally:
         if not orchestrator.shutdown_in_progress:
             await orchestrator.shutdown()
 
 if __name__ == "__main__":
+    exit_code = 1
     try:
-        asyncio.run(main())
+        exit_code = asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
+        exit_code = 0
     except Exception as e:
         logger.error(f"Fatal error: {e}")
-        sys.exit(1)
+        exit_code = 1
+    
+    sys.exit(exit_code)
