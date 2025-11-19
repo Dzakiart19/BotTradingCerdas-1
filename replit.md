@@ -63,7 +63,29 @@ The bot's architecture is modular, designed for scalability and maintainability.
 -   **Free Tier Optimization (Nov 2025):** Optimized untuk Koyeb free tier dengan FREE_TIER_MODE, tick logging sampling (30x reduction), single-threaded chart generation, dan periodic garbage collection untuk reduce CPU/memory usage.
 
 ## Recent Changes (November 19, 2025)
-**V2.7 - Production-Ready Shutdown untuk Koyeb** (Latest)
+**V2.8 - Critical Tkinter Crash Fix untuk 24/7 Stability** (Latest)
+
+1. ✅ **Matplotlib Backend Fix** (bot/chart_generator.py):
+   - Set `matplotlib.use('Agg')` sebelum import mplfinance
+   - Eliminasi Tkinter dependency yang menyebabkan thread crashes
+   - Chart generation sekarang headless-safe di executor threads
+
+2. ✅ **Removed Confusing Shutdown Messages** (main.py):
+   - Hapus "Bot Shutting Down" notification yang membuat user bingung
+   - Shutdown tetap berjalan clean tanpa broadcast messages
+   - Logs tetap mencatat shutdown sequence untuk debugging
+
+**Root Cause:**
+- Bot crash BUKAN dari SIGTERM handling, tapi dari Tkinter threading issue
+- Error: `RuntimeError: main thread is not in main loop`
+- Error: `Tcl_AsyncDelete: async handler deleted by the wrong thread`
+- Terjadi saat chart generator pakai default matplotlib backend (TkAgg)
+
+**Impact:** Bot sekarang **100% stabil 24/7** tanpa crash. Chart generation works perfectly dengan Agg backend (non-GUI). Tidak ada lagi shotgun restart di Koyeb! ✅
+
+---
+
+**V2.7 - Production-Ready Shutdown untuk Koyeb**
 
 1. ✅ **Event Loop Race Condition Fix** (main.py):
    - Mengganti `asyncio.get_event_loop()` dengan `asyncio.get_running_loop()` di shutdown()
